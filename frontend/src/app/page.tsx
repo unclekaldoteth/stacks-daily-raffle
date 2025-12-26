@@ -1,8 +1,6 @@
 'use client';
 
-// Force dynamic rendering to avoid SSR issues with @stacks packages
-export const dynamic = 'force-dynamic';
-
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { JackpotDisplay } from '@/components/JackpotDisplay';
 import { BuyTicketButton } from '@/components/BuyTicketButton';
@@ -12,22 +10,40 @@ import { AdminPanel } from '@/components/AdminPanel';
 import { useWallet } from '@/contexts/WalletContext';
 import { useRaffleContract } from '@/hooks/useRaffleContract';
 
+// Generate particle positions client-side only to avoid hydration mismatch
+function useParticles(count: number) {
+  const [particles, setParticles] = useState<Array<{ left: string; top: string; delay: string }>>([]);
+
+  useEffect(() => {
+    setParticles(
+      Array.from({ length: count }, () => ({
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        delay: `${Math.random() * 4}s`,
+      }))
+    );
+  }, [count]);
+
+  return particles;
+}
+
 export default function Home() {
   const { userAddress } = useWallet();
   const { raffleData, isLoading, error, refetch } = useRaffleContract(userAddress);
+  const particles = useParticles(20);
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Background particles */}
       <div className="particles-bg">
-        {[...Array(20)].map((_, i) => (
+        {particles.map((p, i) => (
           <div
             key={i}
             className="particle"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 4}s`,
+              left: p.left,
+              top: p.top,
+              animationDelay: p.delay,
             }}
           />
         ))}
