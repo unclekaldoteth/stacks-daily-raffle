@@ -1,0 +1,6 @@
+[network]
+name = "testnet"
+stacks_node_rpc_url = "https://api.testnet.hiro.so"
+
+[accounts.deployer]
+mnemonic = "${STX_DEPLOYER_MNEMONIC}"
