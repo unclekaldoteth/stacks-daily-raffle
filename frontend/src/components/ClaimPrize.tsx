@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import { openContractCall } from '@stacks/connect';
-import { PostConditionMode } from '@stacks/transactions';
+import { PostConditionMode, Pc } from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, NETWORK, formatSTX } from '@/lib/constants';
+import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, formatSTX } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
+import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
 
 interface ClaimPrizeProps {
     unclaimedPrize: { amount: bigint; round: number } | null;
@@ -16,8 +17,9 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
     const { isConnected, userAddress } = useWallet();
     const [isProcessing, setIsProcessing] = useState(false);
     const [showSwapOption, setShowSwapOption] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const network = NETWORK === 'mainnet' ? STACKS_MAINNET : STACKS_TESTNET;
+    const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
 
     if (!isConnected || !userAddress || !unclaimedPrize) {
         return null;
@@ -25,15 +27,24 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
 
     const handleClaimPrize = async () => {
         setIsProcessing(true);
+        setError(null);
 
         try {
+            // Secure post conditions: contract will send exact prize amount to user
+            const postConditions = [
+                Pc.principal(`${CONTRACT_ADDRESS}.${CONTRACT_NAME}`)
+                    .willSendGte(unclaimedPrize.amount)
+                    .ustx()
+            ];
+
             await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,
                 contractName: CONTRACT_NAME,
                 functionName: 'claim-prize',
                 functionArgs: [],
-                postConditionMode: PostConditionMode.Allow,
+                postConditionMode: PostConditionMode.Deny,
+                postConditions,
                 onFinish: (data) => {
                     console.log('Claim transaction submitted:', data);
                     setShowSwapOption(true);
@@ -43,8 +54,11 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
                     console.log('Claim cancelled');
                 },
             });
-        } catch (error) {
-            console.error('Error claiming prize:', error);
+        } catch (err) {
+            console.error('Error claiming prize:', err);
+            if (!isUserCancellation(err)) {
+                setError(getContractErrorMessage(err));
+            }
         } finally {
             setIsProcessing(false);
         }

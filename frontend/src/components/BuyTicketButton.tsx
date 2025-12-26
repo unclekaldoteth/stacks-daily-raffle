@@ -8,21 +8,26 @@ import {
     Pc,
 } from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, NETWORK, TICKET_PRICE_USTX } from '@/lib/constants';
+import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, TICKET_PRICE_STX } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
+import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
 
 interface BuyTicketButtonProps {
     onSuccess?: () => void;
     disabled?: boolean;
 }
 
+// Ticket price in microSTX
+const TICKET_PRICE_MICRO = 1000000;
+
 export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
     const { isConnected, userAddress, connect } = useWallet();
     const [quantity, setQuantity] = useState(1);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const network = NETWORK === 'mainnet' ? STACKS_MAINNET : STACKS_TESTNET;
-    const totalCost = (TICKET_PRICE_USTX * quantity) / 1000000;
+    const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
+    const totalCost = TICKET_PRICE_STX * quantity;
 
     const handleBuyTicket = async () => {
         if (!isConnected || !userAddress) {
@@ -31,12 +36,14 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
         }
 
         setIsProcessing(true);
+        setError(null);
 
         try {
-            // Create post condition to limit STX transfer using new Pc builder
+            // Create post condition to limit STX transfer
+            const totalMicroSTX = TICKET_PRICE_MICRO * quantity;
             const postConditions = [
                 Pc.principal(userAddress)
-                    .willSendEq(TICKET_PRICE_USTX * quantity)
+                    .willSendEq(totalMicroSTX)
                     .ustx()
             ];
 
@@ -77,8 +84,11 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
                     },
                 });
             }
-        } catch (error) {
-            console.error('Error buying ticket:', error);
+        } catch (err) {
+            console.error('Error buying ticket:', err);
+            if (!isUserCancellation(err)) {
+                setError(getContractErrorMessage(err));
+            }
         } finally {
             setIsProcessing(false);
         }

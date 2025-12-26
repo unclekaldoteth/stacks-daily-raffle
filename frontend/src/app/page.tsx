@@ -8,6 +8,7 @@ import { JackpotDisplay } from '@/components/JackpotDisplay';
 import { BuyTicketButton } from '@/components/BuyTicketButton';
 import { UserStats } from '@/components/UserStats';
 import { ClaimPrize } from '@/components/ClaimPrize';
+import { AdminPanel } from '@/components/AdminPanel';
 import { useWallet } from '@/contexts/WalletContext';
 import { useRaffleContract } from '@/hooks/useRaffleContract';
 
@@ -68,6 +69,15 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-12">
+              {/* Admin Panel - Only shows for contract owner */}
+              <AdminPanel
+                canDraw={raffleData.canDraw}
+                blocksUntilDraw={raffleData.blocksUntilDraw}
+                ticketsSold={raffleData.ticketsSold}
+                potBalance={raffleData.potBalance}
+                onSuccess={refetch}
+              />
+
               {/* Winner Claim Section - Shows if user has unclaimed prize */}
               {raffleData.unclaimedPrize && (
                 <section>
