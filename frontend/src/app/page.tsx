@@ -104,12 +104,12 @@ export default function Home() {
                 </section>
               )}
 
-              {/* Jackpot Display */}
               <section>
                 <JackpotDisplay
                   potBalance={raffleData.potBalance}
                   estimatedPrize={raffleData.estimatedPrize}
                   ticketsSold={raffleData.ticketsSold}
+                  uniquePlayers={raffleData.uniquePlayers}
                   currentRound={raffleData.currentRound}
                 />
               </section>

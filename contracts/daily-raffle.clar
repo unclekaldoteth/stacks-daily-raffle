@@ -57,6 +57,7 @@
   uint
   {
     tickets-sold: uint,
+    unique-players: uint,
     pot-balance: uint,
     winner: (optional principal),
     is-drawn: bool,
@@ -87,6 +88,7 @@
   (default-to
     {
       tickets-sold: u0,
+      unique-players: u0,
       pot-balance: u0,
       winner: none,
       is-drawn: false,
@@ -142,6 +144,7 @@
       (round-info (get-current-round-info))
       (new-ticket-id (+ (get tickets-sold round-info) u1))
       (user-ticket-info (default-to { count: u0 } (map-get? User-Tickets { round: round, user: tx-sender })))
+      (is-new-player (is-eq (get count user-ticket-info) u0))
     )
     (try! (stx-transfer? TICKET-PRICE tx-sender (as-contract tx-sender)))
     
@@ -153,6 +156,9 @@
     (map-set Round-Info round
       {
         tickets-sold: new-ticket-id,
+        unique-players: (if is-new-player 
+                          (+ (get unique-players round-info) u1) 
+                          (get unique-players round-info)),
         pot-balance: (+ (get pot-balance round-info) TICKET-PRICE),
         winner: none,
         is-drawn: false,
@@ -180,6 +186,7 @@
       (total-cost (* TICKET-PRICE quantity))
       (start-ticket-id (+ (get tickets-sold round-info) u1))
       (user-ticket-info (default-to { count: u0 } (map-get? User-Tickets { round: round, user: tx-sender })))
+      (is-new-player (is-eq (get count user-ticket-info) u0))
     )
     (try! (stx-transfer? total-cost tx-sender (as-contract tx-sender)))
     
@@ -191,6 +198,9 @@
     (map-set Round-Info round
       {
         tickets-sold: (+ (get tickets-sold round-info) quantity),
+        unique-players: (if is-new-player 
+                          (+ (get unique-players round-info) u1) 
+                          (get unique-players round-info)),
         pot-balance: (+ (get pot-balance round-info) total-cost),
         winner: none,
         is-drawn: false,
@@ -238,6 +248,7 @@
       (round (var-get current-round))
       (round-info (get-current-round-info))
       (tickets-sold (get tickets-sold round-info))
+      (unique-players (get unique-players round-info))
       (pot-balance (get pot-balance round-info))
       (blocks-elapsed (- block-height (var-get round-start-block)))
     )
@@ -265,6 +276,7 @@
       (map-set Round-Info round
         {
           tickets-sold: tickets-sold,
+          unique-players: unique-players,
           pot-balance: winner-prize,
           winner: (some winner),
           is-drawn: true,
@@ -344,6 +356,10 @@
 
 (define-read-only (get-tickets-sold)
   (get tickets-sold (get-current-round-info))
+)
+
+(define-read-only (get-unique-players)
+  (get unique-players (get-current-round-info))
 )
 
 (define-read-only (get-user-ticket-count (user principal))

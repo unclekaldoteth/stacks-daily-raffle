@@ -6,6 +6,7 @@ interface JackpotDisplayProps {
     potBalance: bigint;
     estimatedPrize: bigint;
     ticketsSold: number;
+    uniquePlayers: number;
     currentRound: number;
 }
 
@@ -13,6 +14,7 @@ export function JackpotDisplay({
     potBalance,
     estimatedPrize,
     ticketsSold,
+    uniquePlayers,
     currentRound
 }: JackpotDisplayProps) {
     const formatSTX = (amount: bigint) => {
@@ -76,7 +78,7 @@ export function JackpotDisplay({
                     <div className="h-12 w-px bg-gray-700" />
                     <div className="text-center">
                         <div className="text-3xl md:text-4xl font-bold text-pink-400 counter-value">
-                            {ticketsSold}
+                            {uniquePlayers}
                         </div>
                         <div className="text-sm text-gray-400 uppercase tracking-wider">
                             Players

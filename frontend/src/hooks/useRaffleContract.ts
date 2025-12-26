@@ -13,6 +13,7 @@ interface RaffleData {
     currentRound: number;
     potBalance: bigint;
     ticketsSold: number;
+    uniquePlayers: number;
     userTickets: number;
     lastWinner: string | null;
     canDraw: boolean;
@@ -26,6 +27,7 @@ const defaultRaffleData: RaffleData = {
     currentRound: 1,
     potBalance: BigInt(0),
     ticketsSold: 0,
+    uniquePlayers: 0,
     userTickets: 0,
     lastWinner: null,
     canDraw: false,
@@ -79,6 +81,17 @@ export function useRaffleContract(userAddress: string | null) {
                 senderAddress: CONTRACT_ADDRESS,
             });
             const ticketsSold = Number(cvToValue(ticketsSoldResult));
+
+            // Fetch unique players
+            const uniquePlayersResult = await fetchCallReadOnlyFunction({
+                contractAddress: CONTRACT_ADDRESS,
+                contractName: CONTRACT_NAME,
+                functionName: 'get-unique-players',
+                functionArgs: [],
+                network,
+                senderAddress: CONTRACT_ADDRESS,
+            });
+            const uniquePlayers = Number(cvToValue(uniquePlayersResult));
 
             // Fetch ticket price
             const ticketPriceResult = await fetchCallReadOnlyFunction({
@@ -181,6 +194,7 @@ export function useRaffleContract(userAddress: string | null) {
                 currentRound,
                 potBalance,
                 ticketsSold,
+                uniquePlayers,
                 userTickets,
                 lastWinner,
                 canDraw,
