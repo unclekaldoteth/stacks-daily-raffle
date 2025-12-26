@@ -1,0 +1,212 @@
+@import "tailwindcss";
+
+:root {
+  /* Casino Gold Theme */
+  --gold-primary: #FFD700;
+  --gold-secondary: #FFA500;
+  --gold-dark: #B8860B;
+  --casino-black: #0a0a0a;
+  --casino-purple: #4a0e4e;
+  --casino-red: #dc2626;
+  --casino-green: #22c55e;
+  --neon-pink: #ff00ff;
+  --neon-cyan: #00ffff;
+}
+
+/* Custom Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
+                0 0 40px rgba(255, 215, 0, 0.3),
+                0 0 60px rgba(255, 215, 0, 0.1);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8),
+                0 0 60px rgba(255, 215, 0, 0.5),
+                0 0 90px rgba(255, 215, 0, 0.3);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes jackpot-flash {
+  0%, 100% { 
+    text-shadow: 0 0 10px var(--gold-primary),
+                 0 0 20px var(--gold-primary),
+                 0 0 30px var(--gold-secondary);
+  }
+  50% { 
+    text-shadow: 0 0 20px var(--gold-primary),
+                 0 0 40px var(--gold-secondary),
+                 0 0 60px var(--gold-dark),
+                 0 0 80px var(--gold-primary);
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes confetti {
+  0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+body {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 50%, #0a0a0a 100%);
+  min-height: 100vh;
+  color: white;
+  overflow-x: hidden;
+}
+
+/* Utility Classes */
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 215, 0, 0.1) 0%,
+    rgba(255, 215, 0, 0.3) 50%,
+    rgba(255, 215, 0, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.glow-gold {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.float-animation {
+  animation: float 3s ease-in-out infinite;
+}
+
+.jackpot-text {
+  animation: jackpot-flash 1.5s ease-in-out infinite;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.casino-button {
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-dark) 100%);
+  color: #0a0a0a;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.casino-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.casino-button:hover::before {
+  left: 100%;
+}
+
+.casino-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+}
+
+.casino-button:active {
+  transform: scale(0.98);
+}
+
+.casino-button:disabled {
+  background: linear-gradient(135deg, #666 0%, #333 100%);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.stx-gradient {
+  background: linear-gradient(135deg, #5546FF 0%, #7C3AED 100%);
+}
+
+.ticket-card {
+  background: linear-gradient(135deg, rgba(85, 70, 255, 0.2) 0%, rgba(124, 58, 237, 0.2) 100%);
+  border: 1px solid rgba(85, 70, 255, 0.3);
+}
+
+.winner-card {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Neon Text */
+.neon-text {
+  text-shadow: 
+    0 0 5px var(--neon-cyan),
+    0 0 10px var(--neon-cyan),
+    0 0 20px var(--neon-cyan);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-dark) 100%);
+  border-radius: 4px;
+}
+
+/* Particle Background */
+.particles-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: var(--gold-primary);
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Stats Counter Animation */
+.counter-value {
+  font-family: 'Courier New', monospace;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
