@@ -14,6 +14,7 @@ interface WalletContextType {
     connect: () => Promise<void>;
     disconnect: () => void;
     isLoading: boolean;
+    error: string | null;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -22,91 +23,121 @@ interface WalletProviderProps {
     children: ReactNode;
 }
 
+// Safe check for browser environment
+const isBrowser = typeof window !== 'undefined';
+
 export function WalletProvider({ children }: WalletProviderProps) {
     const [isConnectedState, setIsConnected] = useState(false);
     const [userAddress, setUserAddress] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [stacksConnect, setStacksConnect] = useState<typeof import('@stacks/connect') | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [stacksModule, setStacksModule] = useState<{
+        connect: typeof import('@stacks/connect').connect;
+        disconnect: typeof import('@stacks/connect').disconnect;
+        isConnected: typeof import('@stacks/connect').isConnected;
+        getLocalStorage: typeof import('@stacks/connect').getLocalStorage;
+        WalletConnect: typeof import('@stacks/connect').WalletConnect;
+    } | null>(null);
 
-    // Dynamically import @stacks/connect only on client side
+    // Dynamically import @stacks/connect only in browser
     useEffect(() => {
+        if (!isBrowser) {
+            setIsLoading(false);
+            return;
+        }
+
         let mounted = true;
 
-        const loadStacksConnect = async () => {
+        const loadModule = async () => {
             try {
-                const module = await import('@stacks/connect');
+                // Use standard ES dynamic import
+                const mod = await import('@stacks/connect');
+
                 if (mounted) {
-                    setStacksConnect(module);
+                    setStacksModule({
+                        connect: mod.connect,
+                        disconnect: mod.disconnect,
+                        isConnected: mod.isConnected,
+                        getLocalStorage: mod.getLocalStorage,
+                        WalletConnect: mod.WalletConnect,
+                    });
                 }
-            } catch (error) {
-                console.error('Failed to load @stacks/connect:', error);
+            } catch (err) {
+                console.error('Failed to load @stacks/connect:', err);
                 if (mounted) {
+                    setError('Wallet SDK failed to load. Please refresh the page.');
                     setIsLoading(false);
                 }
             }
         };
 
-        loadStacksConnect();
+        loadModule();
 
         return () => {
             mounted = false;
         };
     }, []);
 
-    // Check for existing connection when stacks module loads
+    // Check for existing connection when module loads
     useEffect(() => {
-        if (!stacksConnect) return;
+        if (!stacksModule) return;
 
         const checkConnection = () => {
             try {
-                if (stacksConnect.isConnected()) {
-                    const storage = stacksConnect.getLocalStorage();
-                    if (storage?.addresses?.stx?.[0]?.address) {
-                        setUserAddress(storage.addresses.stx[0].address);
+                if (stacksModule.isConnected()) {
+                    const storage = stacksModule.getLocalStorage();
+                    const address = storage?.addresses?.stx?.[0]?.address;
+                    if (address) {
+                        setUserAddress(address);
                         setIsConnected(true);
                     }
                 }
-            } catch (error) {
-                console.log('No existing connection:', error);
+            } catch (err) {
+                console.log('Connection check failed:', err);
             } finally {
                 setIsLoading(false);
             }
         };
 
         checkConnection();
-    }, [stacksConnect]);
+    }, [stacksModule]);
 
     const handleConnect = useCallback(async () => {
-        if (!stacksConnect) {
-            console.error('Stacks connect not loaded');
+        if (!stacksModule) {
+            setError('Wallet SDK not loaded. Please refresh the page.');
             return;
         }
 
+        setError(null);
+
         try {
-            await stacksConnect.connect({
+            await stacksModule.connect({
                 walletConnect: {
                     projectId: WALLETCONNECT_PROJECT_ID,
-                    networks: [stacksConnect.WalletConnect.Networks.Stacks],
+                    networks: [stacksModule.WalletConnect.Networks.Stacks],
                 },
             });
 
-            const storage = stacksConnect.getLocalStorage();
-            if (storage?.addresses?.stx?.[0]?.address) {
-                setUserAddress(storage.addresses.stx[0].address);
+            const storage = stacksModule.getLocalStorage();
+            const address = storage?.addresses?.stx?.[0]?.address;
+            if (address) {
+                setUserAddress(address);
                 setIsConnected(true);
             }
-        } catch (error) {
-            console.error('Connection error:', error);
+        } catch (err) {
+            console.error('Connection error:', err);
+            setError('Failed to connect wallet. Please try again.');
         }
-    }, [stacksConnect]);
+    }, [stacksModule]);
 
     const handleDisconnect = useCallback(() => {
-        if (stacksConnect) {
-            stacksConnect.disconnect();
+        if (stacksModule) {
+            stacksModule.disconnect();
         }
         setIsConnected(false);
         setUserAddress(null);
-    }, [stacksConnect]);
+        setError(null);
+    }, [stacksModule]);
 
     return (
         <WalletContext.Provider
@@ -116,6 +147,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
                 connect: handleConnect,
                 disconnect: handleDisconnect,
                 isLoading,
+                error,
             }}
         >
             {children}

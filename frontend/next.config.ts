@@ -10,12 +10,26 @@ const nextConfig: NextConfig = {
     '@stacks/auth',
   ],
 
-  // Empty turbopack config to silence the error
-  turbopack: {},
+  // Use Webpack for production builds (Turbopack has issues with @stacks dynamic imports)
+  // Note: Turbopack is only used in dev mode by default
 
-  // Disable static optimization for pages using Stacks SDK
+  // Webpack configuration to properly handle @stacks packages
+  webpack: (config, { isServer }) => {
+    // Don't bundle these packages on the client - let them be loaded dynamically
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+      };
+    }
+    return config;
+  },
+
+  // Disable static optimization for pages using dynamic imports
   experimental: {
-    // Enable server actions if needed
     serverActions: {
       bodySizeLimit: '2mb',
     },
