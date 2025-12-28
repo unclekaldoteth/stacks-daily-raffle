@@ -39,8 +39,8 @@
 ;; Current round number
 (define-data-var current-round uint u1)
 
-;; Block height when round started
-(define-data-var round-start-block uint block-height)
+;; Block height when round started (initialized to 0, set on first action)
+(define-data-var round-start-block uint u0)
 
 ;; ============================================
 ;; Data Maps
@@ -146,7 +146,7 @@
       (user-ticket-info (default-to { count: u0 } (map-get? User-Tickets { round: round, user: tx-sender })))
       (is-new-player (is-eq (get count user-ticket-info) u0))
     )
-    (try! (stx-transfer? TICKET-PRICE tx-sender (as-contract tx-sender)))
+    (try! (stx-transfer? TICKET-PRICE tx-sender current-contract))
     
     (map-set Tickets
       { round: round, ticket-id: new-ticket-id }
@@ -188,7 +188,7 @@
       (user-ticket-info (default-to { count: u0 } (map-get? User-Tickets { round: round, user: tx-sender })))
       (is-new-player (is-eq (get count user-ticket-info) u0))
     )
-    (try! (stx-transfer? total-cost tx-sender (as-contract tx-sender)))
+    (try! (stx-transfer? total-cost tx-sender current-contract))
     
     (fold register-ticket-fold
       (list u1 u2 u3 u4 u5 u6 u7 u8 u9 u10)
@@ -250,7 +250,7 @@
       (tickets-sold (get tickets-sold round-info))
       (unique-players (get unique-players round-info))
       (pot-balance (get pot-balance round-info))
-      (blocks-elapsed (- block-height (var-get round-start-block)))
+      (blocks-elapsed (- stacks-block-height (var-get round-start-block)))
     )
     (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-OWNER)
     (asserts! (> tickets-sold u0) ERR-NO-TICKETS-SOLD)
@@ -267,7 +267,7 @@
         (winner-prize (- pot-balance dev-fee))
       )
       
-      (try! (as-contract (stx-transfer? dev-fee tx-sender CONTRACT-OWNER)))
+      (try! (as-contract? ((with-stx dev-fee)) (unwrap-panic (stx-transfer? dev-fee tx-sender CONTRACT-OWNER))))
       
       (map-set Unclaimed-Prizes winner
         { amount: winner-prize, round: round }
@@ -280,14 +280,14 @@
           pot-balance: winner-prize,
           winner: (some winner),
           is-drawn: true,
-          draw-block: block-height,
+          draw-block: stacks-block-height,
           prize-amount: winner-prize,
           is-claimed: false
         }
       )
       
       (var-set current-round (+ round u1))
-      (var-set round-start-block block-height)
+      (var-set round-start-block stacks-block-height)
       
       (print { 
         event: "winner-drawn",
@@ -315,7 +315,7 @@
       (prize-amount (get amount prize-info))
       (prize-round (get round prize-info))
     )
-    (try! (as-contract (stx-transfer? prize-amount tx-sender tx-sender)))
+    (try! (as-contract? ((with-stx prize-amount)) (unwrap-panic (stx-transfer? prize-amount tx-sender contract-caller))))
     
     (map-delete Unclaimed-Prizes tx-sender)
     
@@ -403,7 +403,7 @@
 (define-read-only (get-blocks-until-draw)
   (let
     (
-      (blocks-elapsed (- block-height (var-get round-start-block)))
+      (blocks-elapsed (- stacks-block-height (var-get round-start-block)))
     )
     (if (>= blocks-elapsed MIN-BLOCKS-BEFORE-DRAW)
       u0
@@ -416,7 +416,7 @@
   (let
     (
       (round-info (get-current-round-info))
-      (blocks-elapsed (- block-height (var-get round-start-block)))
+      (blocks-elapsed (- stacks-block-height (var-get round-start-block)))
     )
     (and
       (> (get tickets-sold round-info) u0)

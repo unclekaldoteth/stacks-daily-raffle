@@ -1,154 +1,119 @@
 # Daily Stacks Raffle
 
-A decentralized daily lottery built on the Stacks blockchain. Users purchase tickets with STX, and one winner is randomly selected to take the pot.
+A decentralized daily lottery built on the Stacks blockchain. Users purchase tickets with STX, and one winner is randomly selected to take the pot using verifiable randomness from the Bitcoin blockchain.
 
 Live Demo: https://stacks-raffle-app.vercel.app
 
-## Deployment
+## How It Works (Product Flow)
 
-| Network | Contract Address |
-|---------|------------------|
-| Testnet | `ST1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX28M1PMM.daily-raffle-v2` |
+### 1. User Connects Wallet
+Users sign in using a Stacks-compatible wallet (Leather, Xverse) or WalletConnect to interact with the raffle.
 
-## Architecture
+### 2. Purchase Tickets
+Users select between 1 to 10 tickets. Each ticket costs 1 STX. The payment is secured by Stacks post-conditions to ensure only the specified amount is transferred.
 
-```
-+------------------+     +-------------------+     +------------------+
-|                  |     |                   |     |                  |
-|   Next.js App    |---->|   Stacks Node     |---->|  Clarity Smart   |
-|   (Frontend)     |     |   (Hiro API)      |     |    Contract      |
-|                  |     |                   |     |                  |
-+------------------+     +-------------------+     +------------------+
-        |                                                  |
-        |                                                  |
-        v                                                  v
-+------------------+                              +------------------+
-|                  |                              |                  |
-|  @stacks/connect |                              |  Bitcoin Block   |
-|  (Wallet SDK)    |                              |  Hash Randomness |
-|                  |                              |                  |
-+------------------+                              +------------------+
-```
+### 3. Contract Pools STX
+All purchased STX are pooled in the smart contract. A 5% developer fee is reserved, while 95% of the pot goes to the eventual winner.
 
-### Components
+### 4. Random Winner Selection
+The contract owner triggers a draw after a minimum of 10 blocks. The winner is selected using the Bitcoin block hash as a verifiable seed for randomness.
 
-1. **Smart Contract** (daily-raffle-v2.clar)
-   - Manages ticket purchases, pot accumulation, and winner selection
-   - Uses Bitcoin block hash for verifiable randomness
-   - Tracks unique players separately from tickets sold
+### 5. Claim Prize
+The winner can claim their prize via the dashboard. The STX is then transferred directly to the winner's wallet.
 
-2. **Frontend** (Next.js 16 + TypeScript)
-   - Wallet connection via @stacks/connect with WalletConnect support
-   - Real-time contract state reading
-   - Admin panel for triggering draws
-
-3. **Wallet Integration**
-   - Leather, Xverse, and WalletConnect compatible
-   - Post-conditions for transaction security
-
-## How It Works
-
-### Ticket Purchase Flow
-
-1. User connects Stacks wallet
-2. User selects number of tickets (1-10)
-3. Transaction is signed with STX post-condition
-4. Contract records ticket ownership and updates pot
-
-### Winner Selection Flow
-
-1. Admin triggers draw (minimum 10 blocks must pass)
-2. Contract fetches Bitcoin block hash from burn chain
-3. Random ticket ID = (block_hash mod tickets_sold) + 1
-4. Winner's address is recorded with prize amount
-5. 5% dev fee deducted, 95% allocated to winner
-
-### Prize Claim Flow
-
-1. Winner sees claim banner on frontend
-2. Winner calls claim-prize function
-3. STX transferred from contract to winner
-4. Prize record cleared
-
-## Contract Functions
-
-### Public Functions
-
-| Function | Description | Access |
-|----------|-------------|--------|
-| `buy-ticket` | Purchase 1 ticket for 1 STX | Anyone |
-| `buy-tickets(quantity)` | Purchase up to 10 tickets | Anyone |
-| `draw-winner` | Select random winner | Owner only |
-| `claim-prize` | Claim winnings | Winner only |
+## Smart Contract Logic (Clarity 4)
 
 ### Read-Only Functions
+The following functions allow reading the state of the raffle:
+- get-current-round: Returns the current round number.
+- get-pot-balance: Returns the total pot in microSTX.
+- get-tickets-sold: Returns the number of tickets sold in the current round.
+- get-unique-players: Returns the number of unique wallets participating.
+- get-user-ticket-count(user): Returns the number of tickets owned by a specific user.
+- can-draw: Boolean indicating if a draw can currently be triggered.
 
-| Function | Returns |
-|----------|---------|
-| `get-current-round` | Current round number |
-| `get-pot-balance` | Total pot in microSTX |
-| `get-tickets-sold` | Number of tickets sold |
-| `get-unique-players` | Number of unique wallets |
-| `get-user-ticket-count(user)` | User's ticket count |
-| `get-unclaimed-prize(user)` | User's unclaimed prize |
-| `can-draw` | Whether draw is allowed |
+### Public Functions
+- buy-ticket: Purchase 1 ticket.
+- buy-tickets(quantity): Purchase multiple tickets (up to 10).
+- draw-winner: Selects the winner (Owner only).
+- claim-prize: Allows the winner to withdraw their prize.
 
-## Tech Stack
+## Success Metrics
+- Total STX volume processed through the raffle.
+- Number of unique daily participants.
+- Average pot size per round.
+- Retention rate of daily players.
+- Number of successful prize claims.
 
-- **Blockchain**: Stacks (Bitcoin L2)
-- **Smart Contract**: Clarity 2.0
-- **Frontend**: Next.js 16, TypeScript, React 19
-- **Wallet SDK**: @stacks/connect 8.x
-- **Styling**: TailwindCSS 4
-- **Deployment**: Vercel
+## Roadmap
 
-## Local Development
+### Phase 1 - Core System (Completed)
+- Raffle Smart Contract logic.
+- Verifiable randomness integration.
+- Round management system.
+- Basic frontend integration.
+
+### Phase 2 - Advanced Features (Completed)
+- Multi-ticket purchase support.
+- Unique player tracking.
+- WalletConnect integration.
+- Admin dashboard.
+
+### Phase 3 - Deployment (Completed)
+- Upgrade to Clarity 4.
+- Testnet validation.
+- Mainnet deployment.
+
+### Phase 4 - Ecosystem Expansion
+- Social sharing for wins.
+- Automatic round scheduling.
+- Secondary rewards for participants.
+
+## Mainnet Deployment
+
+The Daily Stacks Raffle smart contracts are successfully deployed and verified on Stacks Mainnet.
+
+Deployer Address: SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T
+
+### Deployed Contracts
+```
+SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2
+```
+
+### Deployment Details
+- Network: Stacks Mainnet
+- Deployment Fee: 10
+- Deployment Date: December 28, 2025
+- Contract Version: Clarity 4 (SIP-033)
+- Status: All contracts confirmed on-chain
+
+### Explorer Link
+View on Stacks Explorer: [https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2?chain=mainnet](https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2?chain=mainnet)
+
+## Technical Start Guide
 
 ### Prerequisites
+- Node.js 18 or higher.
+- Clarinet CLI for contract development.
+- Stacks wallet for testing.
 
-- Node.js 18+
-- Clarinet CLI
-- Stacks wallet (Leather/Xverse)
+### Local Development
+1. Clone the repository:
+   git clone https://github.com/unclekaldoteth/stacks-daily-raffle.git
+2. Install dependencies:
+   cd frontend && npm install
+3. Start the dev server:
+   npm run dev
 
-### Setup
+### Contract Testing
+1. Run contract checks:
+   clarinet check
+2. Launch local console:
+   clarinet console
 
-```bash
-# Clone repository
-git clone https://github.com/unclekaldoteth/stacks-daily-raffle.git
-cd stacks-daily-raffle
-
-# Install frontend dependencies
-cd frontend
-npm install
-
-# Start development server
-npm run dev
-```
-
-Open http://localhost:3000
-
-### Contract Development
-
-```bash
-# Check contract syntax
-clarinet check
-
-# Run local devnet
-clarinet devnet start
-
-# Deploy to testnet
-export STX_DEPLOYER_MNEMONIC="your mnemonic"
-clarinet deployments generate --testnet --low-cost
-clarinet deployments apply --testnet
-```
-
-## Security
-
-- All transactions use PostConditionMode.Deny with explicit post-conditions
-- Contract uses asserts for access control
-- No auto-payout: winners must actively claim prizes
-- Mnemonic stored as environment variable, not in code
+## Contributing
+Contributions are welcome. Please open an issue or submit a pull request for any improvements.
 
 ## License
+This project is licensed under the MIT License.
 
-MIT

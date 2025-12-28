@@ -24,6 +24,7 @@ deployments/
 .env.*.local
 settings/Devnet.toml
 settings/Simnet.toml
+settings/Mainnet.toml
 # settings/Testnet.toml is included with placeholder, but we ignore other settings
 
 # OS
