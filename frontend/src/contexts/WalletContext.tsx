@@ -1,162 +1,109 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-
-/**
- * IMPORTANT: WalletConnect is currently DISABLED due to a known bug in @stacks/connect v8.
- * See: https://github.com/stx-labs/connect/issues/474
- * 
- * The bug causes: "Cannot use 'in' operator to search for 'network' in undefined"
- * when using WalletConnect config.
- * 
- * When the bug is fixed upstream, uncomment the WalletConnect configuration below.
- * For now, we use browser extension wallets only (Leather, Xverse).
- */
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { WALLETCONNECT_PROJECT_ID, NETWORK } from '@/config';
 
 interface WalletContextType {
     isConnected: boolean;
     userAddress: string | null;
-    connect: () => Promise<void>;
-    disconnect: () => void;
     isLoading: boolean;
     error: string | null;
+    connect: () => Promise<void>;
+    disconnect: () => void;
 }
 
-const WalletContext = createContext<WalletContextType | undefined>(undefined);
+const WalletContext = createContext<WalletContextType | null>(null);
 
-interface WalletProviderProps {
-    children: ReactNode;
-}
-
-// Safe check for browser environment
-const isBrowser = typeof window !== 'undefined';
-
-export function WalletProvider({ children }: WalletProviderProps) {
-    const [isConnectedState, setIsConnected] = useState(false);
+export function WalletProvider({ children }: { children: ReactNode }) {
+    const [isConnected, setIsConnected] = useState(false);
     const [userAddress, setUserAddress] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stacksConnect, setStacksConnect] = useState<typeof import('@stacks/connect') | null>(null);
+    const [isClient, setIsClient] = useState(false);
 
-    // Dynamically import @stacks/connect only in browser
     useEffect(() => {
-        if (!isBrowser) {
-            setIsLoading(false);
-            return;
-        }
-
-        let mounted = true;
-
-        const loadModule = async () => {
-            try {
-                const mod = await import('@stacks/connect');
-
-                if (mounted) {
-                    setStacksConnect(mod);
-                }
-            } catch (err) {
-                console.error('Failed to load @stacks/connect:', err);
-                if (mounted) {
-                    setError('Wallet SDK failed to load. Please refresh the page.');
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        loadModule();
-
-        return () => {
-            mounted = false;
-        };
+        setIsClient(true);
     }, []);
 
-    // Check for existing connection when module loads
+    // Check for existing session on mount
     useEffect(() => {
-        if (!stacksConnect) return;
+        if (!isClient) return;
 
-        const checkConnection = () => {
+        const checkSession = async () => {
             try {
-                if (stacksConnect.isConnected()) {
-                    const storage = stacksConnect.getLocalStorage();
-                    const address = storage?.addresses?.stx?.[0]?.address;
-                    if (address) {
-                        setUserAddress(address);
-                        setIsConnected(true);
-                    }
+                const { getLocalStorage } = await import('@stacks/connect');
+                const userData = getLocalStorage();
+                if (userData?.addresses?.stx?.[0]?.address) {
+                    setIsConnected(true);
+                    setUserAddress(userData.addresses.stx[0].address);
                 }
             } catch (err) {
-                console.log('Connection check failed:', err);
+                console.error('Failed to check session:', err);
             } finally {
                 setIsLoading(false);
             }
         };
+        checkSession();
+    }, [isClient]);
 
-        checkConnection();
-    }, [stacksConnect]);
+    const connect = useCallback(async () => {
+        if (!isClient || typeof window === 'undefined') return;
 
-    const handleConnect = useCallback(async () => {
-        if (!stacksConnect) {
-            setError('Wallet SDK not loaded. Please refresh the page.');
-            return;
-        }
-
+        setIsLoading(true);
         setError(null);
 
         try {
-            // Connect without WalletConnect config due to bug in @stacks/connect
-            // This will show browser extension wallets (Leather, Xverse)
-            // 
-            // TODO: Re-enable WalletConnect when bug is fixed upstream
-            // See: https://github.com/stx-labs/connect/issues/474
-            //
-            // const WC = stacksConnect.WalletConnect;
-            // await stacksConnect.connect({
-            //     walletConnect: {
-            //         projectId: 'c45e941fc195a6b71c5023a7b18b970a',
-            //         networks: [WC.Networks.Stacks],
-            //     },
-            // });
+            const { connect: stacksConnect, getLocalStorage } = await import('@stacks/connect');
 
-            await stacksConnect.connect();
+            // Key configuration for WalletConnect to work:
+            // - walletConnectProjectId: Required for WalletConnect option
+            // - network: Required to avoid 'network in undefined' error
+            await stacksConnect({
+                walletConnectProjectId: WALLETCONNECT_PROJECT_ID,
+                network: NETWORK === 'mainnet' ? 'mainnet' : 'testnet',
+            });
 
             // Wait for connection to establish
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            const storage = stacksConnect.getLocalStorage();
-            const address = storage?.addresses?.stx?.[0]?.address;
-            if (address) {
-                setUserAddress(address);
+            // Get address from localStorage after connection
+            const userData = getLocalStorage();
+            if (userData?.addresses?.stx?.[0]?.address) {
                 setIsConnected(true);
+                setUserAddress(userData.addresses.stx[0].address);
             } else {
                 setError('Connected but no address found. Please try again.');
             }
         } catch (err) {
-            console.error('Connection error:', err);
+            console.error('Failed to connect wallet:', err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
             setError(`Failed to connect: ${errorMessage}`);
+        } finally {
+            setIsLoading(false);
         }
-    }, [stacksConnect]);
+    }, [isClient]);
 
-    const handleDisconnect = useCallback(() => {
-        if (stacksConnect) {
-            stacksConnect.disconnect();
+    const disconnect = useCallback(async () => {
+        try {
+            const { disconnect: stacksDisconnect } = await import('@stacks/connect');
+            await stacksDisconnect();
+            setIsConnected(false);
+            setUserAddress(null);
+            setError(null);
+        } catch (err) {
+            console.error('Failed to disconnect:', err);
         }
-        setIsConnected(false);
-        setUserAddress(null);
-        setError(null);
-    }, [stacksConnect]);
+    }, []);
 
     return (
-        <WalletContext.Provider
-            value={{
-                isConnected: isConnectedState,
-                userAddress,
-                connect: handleConnect,
-                disconnect: handleDisconnect,
-                isLoading,
-                error,
-            }}
-        >
+        <WalletContext.Provider value={{
+            isConnected,
+            userAddress,
+            isLoading,
+            error,
+            connect,
+            disconnect
+        }}>
             {children}
         </WalletContext.Provider>
     );
@@ -164,7 +111,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
 export function useWallet() {
     const context = useContext(WalletContext);
-    if (context === undefined) {
+    if (!context) {
         throw new Error('useWallet must be used within a WalletProvider');
     }
     return context;
