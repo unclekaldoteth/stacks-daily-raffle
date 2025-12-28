@@ -24,9 +24,9 @@ export function Header() {
                 </div>
 
                 {/* Network Badge */}
-                <div className="hidden md:flex items-center gap-2 bg-purple-900/50 px-3 py-1.5 rounded-full">
-                    <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
-                    <span className="text-sm text-purple-300">Testnet</span>
+                <div className="hidden md:flex items-center gap-2 bg-green-900/50 px-3 py-1.5 rounded-full">
+                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-sm text-green-300">Mainnet</span>
                 </div>
 
                 {/* Wallet Connection */}
