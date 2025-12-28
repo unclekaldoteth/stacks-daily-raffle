@@ -2,8 +2,16 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
-// WalletConnect Project ID - Get yours at https://cloud.walletconnect.com
-const WALLETCONNECT_PROJECT_ID = 'c45e941fc195a6b71c5023a7b18b970a';
+/**
+ * IMPORTANT: WalletConnect is currently DISABLED due to a known bug in @stacks/connect v8.
+ * See: https://github.com/stx-labs/connect/issues/474
+ * 
+ * The bug causes: "Cannot use 'in' operator to search for 'network' in undefined"
+ * when using WalletConnect config.
+ * 
+ * When the bug is fixed upstream, uncomment the WalletConnect configuration below.
+ * For now, we use browser extension wallets only (Leather, Xverse).
+ */
 
 interface WalletContextType {
     isConnected: boolean;
@@ -95,23 +103,21 @@ export function WalletProvider({ children }: WalletProviderProps) {
         setError(null);
 
         try {
-            // Access WalletConnect config - use type assertion to handle dynamic import
-            const WC = stacksConnect.WalletConnect;
+            // Connect without WalletConnect config due to bug in @stacks/connect
+            // This will show browser extension wallets (Leather, Xverse)
+            // 
+            // TODO: Re-enable WalletConnect when bug is fixed upstream
+            // See: https://github.com/stx-labs/connect/issues/474
+            //
+            // const WC = stacksConnect.WalletConnect;
+            // await stacksConnect.connect({
+            //     walletConnect: {
+            //         projectId: 'c45e941fc195a6b71c5023a7b18b970a',
+            //         networks: [WC.Networks.Stacks],
+            //     },
+            // });
 
-            if (WC && WC.Networks && WC.Networks.Stacks) {
-                // Per @stacks/connect docs: networks: [WalletConnect.Networks.Stacks]
-                await stacksConnect.connect({
-                    walletConnect: {
-                        projectId: WALLETCONNECT_PROJECT_ID,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        networks: [WC.Networks.Stacks] as any,
-                    },
-                });
-            } else {
-                // Fallback: Use basic connect (browser extension only)
-                console.log('WalletConnect not available, using basic connect');
-                await stacksConnect.connect();
-            }
+            await stacksConnect.connect();
 
             // Wait for connection to establish
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -163,5 +169,3 @@ export function useWallet() {
     }
     return context;
 }
-
-export { WALLETCONNECT_PROJECT_ID };
