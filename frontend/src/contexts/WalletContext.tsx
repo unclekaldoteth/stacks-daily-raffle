@@ -111,6 +111,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
         setError(null);
 
         try {
+            // Configure WalletConnect for Stacks (includes both mainnet and testnet)
             await stacksModule.connect({
                 walletConnect: {
                     projectId: WALLETCONNECT_PROJECT_ID,
@@ -118,15 +119,21 @@ export function WalletProvider({ children }: WalletProviderProps) {
                 },
             });
 
+            // Wait a moment for the connection to establish
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             const storage = stacksModule.getLocalStorage();
             const address = storage?.addresses?.stx?.[0]?.address;
             if (address) {
                 setUserAddress(address);
                 setIsConnected(true);
+            } else {
+                setError('Connected but no address found. Please try again.');
             }
         } catch (err) {
             console.error('Connection error:', err);
-            setError('Failed to connect wallet. Please try again.');
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            setError(`Failed to connect: ${errorMessage}`);
         }
     }, [stacksModule]);
 

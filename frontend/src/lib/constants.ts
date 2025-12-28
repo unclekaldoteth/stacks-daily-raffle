@@ -1,9 +1,9 @@
-// Contract configuration - Deployed to testnet
-export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || 'ST1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX28M1PMM';
+// Contract configuration - Deployed to mainnet
+export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || 'SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T';
 export const CONTRACT_NAME = 'daily-raffle-v2';
 
 // Network configuration - Centralized for all components
-export const NETWORK = process.env.NEXT_PUBLIC_STACKS_NETWORK || 'testnet';
+export const NETWORK = process.env.NEXT_PUBLIC_STACKS_NETWORK || 'mainnet';
 export const IS_MAINNET = NETWORK === 'mainnet';
 
 // Hiro API Configuration
