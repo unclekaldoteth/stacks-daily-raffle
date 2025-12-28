@@ -2,11 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
-// WalletConnect Project ID
+// WalletConnect Project ID - Get yours at https://cloud.walletconnect.com
 const WALLETCONNECT_PROJECT_ID = 'c45e941fc195a6b71c5023a7b18b970a';
-
-// Reown AppKit Project ID
-const REOWN_PROJECT_ID = '2d9ce845e3cd0bd340aadadcd00afc53';
 
 interface WalletContextType {
     isConnected: boolean;
@@ -31,13 +28,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     const [userAddress, setUserAddress] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stacksModule, setStacksModule] = useState<{
-        connect: typeof import('@stacks/connect').connect;
-        disconnect: typeof import('@stacks/connect').disconnect;
-        isConnected: typeof import('@stacks/connect').isConnected;
-        getLocalStorage: typeof import('@stacks/connect').getLocalStorage;
-        WalletConnect: typeof import('@stacks/connect').WalletConnect;
-    } | null>(null);
+    const [stacksConnect, setStacksConnect] = useState<typeof import('@stacks/connect') | null>(null);
 
     // Dynamically import @stacks/connect only in browser
     useEffect(() => {
@@ -50,17 +41,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
         const loadModule = async () => {
             try {
-                // Use standard ES dynamic import
                 const mod = await import('@stacks/connect');
+                console.log('Loaded @stacks/connect module:', Object.keys(mod));
+                console.log('WalletConnect available:', !!mod.WalletConnect);
+                console.log('WalletConnect.Networks:', mod.WalletConnect?.Networks);
 
                 if (mounted) {
-                    setStacksModule({
-                        connect: mod.connect,
-                        disconnect: mod.disconnect,
-                        isConnected: mod.isConnected,
-                        getLocalStorage: mod.getLocalStorage,
-                        WalletConnect: mod.WalletConnect,
-                    });
+                    setStacksConnect(mod);
                 }
             } catch (err) {
                 console.error('Failed to load @stacks/connect:', err);
@@ -80,12 +67,12 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
     // Check for existing connection when module loads
     useEffect(() => {
-        if (!stacksModule) return;
+        if (!stacksConnect) return;
 
         const checkConnection = () => {
             try {
-                if (stacksModule.isConnected()) {
-                    const storage = stacksModule.getLocalStorage();
+                if (stacksConnect.isConnected()) {
+                    const storage = stacksConnect.getLocalStorage();
                     const address = storage?.addresses?.stx?.[0]?.address;
                     if (address) {
                         setUserAddress(address);
@@ -100,10 +87,10 @@ export function WalletProvider({ children }: WalletProviderProps) {
         };
 
         checkConnection();
-    }, [stacksModule]);
+    }, [stacksConnect]);
 
     const handleConnect = useCallback(async () => {
-        if (!stacksModule) {
+        if (!stacksConnect) {
             setError('Wallet SDK not loaded. Please refresh the page.');
             return;
         }
@@ -111,18 +98,28 @@ export function WalletProvider({ children }: WalletProviderProps) {
         setError(null);
 
         try {
-            // Configure WalletConnect for Stacks (includes both mainnet and testnet)
-            await stacksModule.connect({
-                walletConnect: {
-                    projectId: WALLETCONNECT_PROJECT_ID,
-                    networks: [stacksModule.WalletConnect.Networks.Stacks],
-                },
-            });
+            // Check if WalletConnect is properly loaded
+            if (!stacksConnect.WalletConnect || !stacksConnect.WalletConnect.Networks) {
+                console.error('WalletConnect not available, falling back to basic connect');
+                // Fallback: Use basic connect without WalletConnect config
+                await stacksConnect.connect();
+            } else {
+                // Use WalletConnect with proper configuration
+                const networks = stacksConnect.WalletConnect.Networks;
+                console.log('Using WalletConnect with networks:', networks);
 
-            // Wait a moment for the connection to establish
+                await stacksConnect.connect({
+                    walletConnect: {
+                        projectId: WALLETCONNECT_PROJECT_ID,
+                        networks: [networks.Stacks],
+                    },
+                });
+            }
+
+            // Wait for connection to establish
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            const storage = stacksModule.getLocalStorage();
+            const storage = stacksConnect.getLocalStorage();
             const address = storage?.addresses?.stx?.[0]?.address;
             if (address) {
                 setUserAddress(address);
@@ -135,16 +132,16 @@ export function WalletProvider({ children }: WalletProviderProps) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
             setError(`Failed to connect: ${errorMessage}`);
         }
-    }, [stacksModule]);
+    }, [stacksConnect]);
 
     const handleDisconnect = useCallback(() => {
-        if (stacksModule) {
-            stacksModule.disconnect();
+        if (stacksConnect) {
+            stacksConnect.disconnect();
         }
         setIsConnected(false);
         setUserAddress(null);
         setError(null);
-    }, [stacksModule]);
+    }, [stacksConnect]);
 
     return (
         <WalletContext.Provider
@@ -170,4 +167,4 @@ export function useWallet() {
     return context;
 }
 
-export { WALLETCONNECT_PROJECT_ID, REOWN_PROJECT_ID };
+export { WALLETCONNECT_PROJECT_ID };
