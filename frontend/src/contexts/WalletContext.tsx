@@ -42,9 +42,6 @@ export function WalletProvider({ children }: WalletProviderProps) {
         const loadModule = async () => {
             try {
                 const mod = await import('@stacks/connect');
-                console.log('Loaded @stacks/connect module:', Object.keys(mod));
-                console.log('WalletConnect available:', !!mod.WalletConnect);
-                console.log('WalletConnect.Networks:', mod.WalletConnect?.Networks);
 
                 if (mounted) {
                     setStacksConnect(mod);
@@ -98,22 +95,22 @@ export function WalletProvider({ children }: WalletProviderProps) {
         setError(null);
 
         try {
-            // Check if WalletConnect is properly loaded
-            if (!stacksConnect.WalletConnect || !stacksConnect.WalletConnect.Networks) {
-                console.error('WalletConnect not available, falling back to basic connect');
-                // Fallback: Use basic connect without WalletConnect config
-                await stacksConnect.connect();
-            } else {
-                // Use WalletConnect with proper configuration
-                const networks = stacksConnect.WalletConnect.Networks;
-                console.log('Using WalletConnect with networks:', networks);
+            // Access WalletConnect config - use type assertion to handle dynamic import
+            const WC = stacksConnect.WalletConnect;
 
+            if (WC && WC.Networks && WC.Networks.Stacks) {
+                // Per @stacks/connect docs: networks: [WalletConnect.Networks.Stacks]
                 await stacksConnect.connect({
                     walletConnect: {
                         projectId: WALLETCONNECT_PROJECT_ID,
-                        networks: [networks.Stacks],
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        networks: [WC.Networks.Stacks] as any,
                     },
                 });
+            } else {
+                // Fallback: Use basic connect (browser extension only)
+                console.log('WalletConnect not available, using basic connect');
+                await stacksConnect.connect();
             }
 
             // Wait for connection to establish
