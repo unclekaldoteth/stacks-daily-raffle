@@ -1,119 +1,230 @@
-# Daily Stacks Raffle
+# Stacks Daily Raffle
 
-A decentralized daily lottery built on the Stacks blockchain. Users purchase tickets with STX, and one winner is randomly selected to take the pot using verifiable randomness from the Bitcoin blockchain.
+A decentralized daily raffle system built on Stacks with Clarity 4, enabling fair and transparent prize draws with automatic winner selection.
 
-Live Demo: https://stacks-raffle-app.vercel.app
+Stacks Daily Raffle allows users to buy tickets for a chance to win the jackpot. Each round runs for a configurable number of blocks, and winners are selected using Verifiable Random Functions (VRF) for provable fairness. Supports multi-ticket purchases and WalletConnect for mobile wallets.
 
-## How It Works (Product Flow)
+---
 
-### 1. User Connects Wallet
-Users sign in using a Stacks-compatible wallet (Leather, Xverse) or WalletConnect to interact with the raffle.
+## Why Stacks Daily Raffle?
 
-### 2. Purchase Tickets
-Users select between 1 to 10 tickets. Each ticket costs 1 STX. The payment is secured by Stacks post-conditions to ensure only the specified amount is transferred.
+Traditional raffles rely on centralized entities for random number generation and prize distribution - creating trust issues and opacity.
 
-### 3. Contract Pools STX
-All purchased STX are pooled in the smart contract. A 5% developer fee is reserved, while 95% of the pot goes to the eventual winner.
+**Stacks Daily Raffle fixes this.**
+Winner selection uses on-chain VRF for verifiable randomness. All ticket purchases and prize distributions are fully transparent on-chain. Smart contracts automatically execute payouts with no manual intervention.
 
-### 4. Random Winner Selection
-The contract owner triggers a draw after a minimum of 10 blocks. The winner is selected using the Bitcoin block hash as a verifiable seed for randomness.
+---
 
-### 5. Claim Prize
-The winner can claim their prize via the dashboard. The STX is then transferred directly to the winner's wallet.
+## Key Features
 
-## Smart Contract Logic (Clarity 4)
+### For Players
+- Buy single or multiple tickets per round
+- View real-time jackpot amount
+- Automatic prize claiming after wins
+- View personal ticket count and win history
 
-### Read-Only Functions
-The following functions allow reading the state of the raffle:
-- get-current-round: Returns the current round number.
-- get-pot-balance: Returns the total pot in microSTX.
-- get-tickets-sold: Returns the number of tickets sold in the current round.
-- get-unique-players: Returns the number of unique wallets participating.
-- get-user-ticket-count(user): Returns the number of tickets owned by a specific user.
-- can-draw: Boolean indicating if a draw can currently be triggered.
+### For Transparency
+- VRF-based winner selection (provable fairness)
+- On-chain ticket purchases
+- Automatic round progression
+- Transparent fee structure (5% dev fee)
+
+### For Developers
+- Clarity 4 smart contract
+- Read-only functions for integration
+- Event emissions for off-chain indexing
+- Open-source codebase
+
+---
+
+## Architecture Overview
+
+### Smart Contracts (Clarity 4)
+| Contract | Description |
+|----------|-------------|
+| **daily-raffle-v2** | Main raffle logic, ticket sales, VRF winner selection |
+
+### Frontend (Next.js)
+- Modern React UI with real-time updates
+- WalletConnect + browser extension support
+- Responsive design
+
+---
+
+## Live Demo
+
+Frontend: https://stacks-daily-raffle.vercel.app
+
+---
+
+## Mainnet Deployment
+
+### Smart Contract Live on Stacks Mainnet
+The daily-raffle-v2 contract is successfully deployed and verified on Stacks Mainnet.
+
+**Deployer Address:** `SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T`
+
+### Deployed Contract
+| Contract Name | Description |
+|--------------|-------------|
+| **daily-raffle-v2** | Raffle system with multi-ticket support and VRF |
+
+### Deployment Details
+- **Network:** Stacks Mainnet
+- **Clarity Version:** 4
+- **Epoch:** 3.3
+- **Ticket Price:** 1 STX
+- **Dev Fee:** 5%
+- **Status:** Confirmed on-chain
+
+### Explorer Links
+View contract on Stacks Explorer:
+https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2?chain=mainnet
+
+### Contract Address for Integration
+```clarity
+;; Main Raffle Contract
+SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2
+```
+
+---
+
+## Smart Contract Functions
 
 ### Public Functions
-- buy-ticket: Purchase 1 ticket.
-- buy-tickets(quantity): Purchase multiple tickets (up to 10).
-- draw-winner: Selects the winner (Owner only).
-- claim-prize: Allows the winner to withdraw their prize.
+| Function | Description |
+|----------|-------------|
+| `buy-ticket` | Purchase a single ticket for the current round |
+| `buy-tickets` | Purchase multiple tickets (1-100) in one transaction |
+| `draw-winner` | Trigger the VRF-based winner selection (admin only) |
+| `claim-prize` | Claim winnings for a completed round |
 
-## Success Metrics
-- Total STX volume processed through the raffle.
-- Number of unique daily participants.
-- Average pot size per round.
-- Retention rate of daily players.
-- Number of successful prize claims.
+### Read-Only Functions
+| Function | Description |
+|----------|-------------|
+| `get-ticket-price` | Returns the ticket price in uSTX |
+| `get-current-round` | Returns the current round number |
+| `get-round-info` | Returns details about a specific round |
+| `get-player-tickets` | Returns ticket count for a player in a round |
+| `get-pot-balance` | Returns the current jackpot amount |
+
+---
+
+## Wallet Integration
+
+### Stacks Wallet (Leather/Xverse)
+Native browser extension support with one-click connection.
+
+### WalletConnect
+Mobile wallet support via WalletConnect protocol.
+
+### Implementation
+```typescript
+import { connect } from '@stacks/connect';
+
+await connect({
+    walletConnectProjectId: 'your-project-id',
+    network: 'mainnet',
+});
+```
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Clarinet 3.11+
+- Stacks wallet (Leather or Xverse)
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+# Opens at http://localhost:3000
+```
+
+### Smart Contracts
+```bash
+# Check contracts
+clarinet check
+
+# Deploy to mainnet
+clarinet deployments apply -p deployments/default.mainnet-plan.yaml
+```
+
+---
+
+## Environment Variables
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your-walletconnect-project-id
+NEXT_PUBLIC_NETWORK=mainnet
+NEXT_PUBLIC_CONTRACT_ADDRESS=SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T
+```
+
+---
+
+## Tech Stack
+
+### Frontend
+- Next.js 16
+- React 19
+- @stacks/connect v8
+- TailwindCSS 4
+
+### Smart Contracts
+- Clarity 4
+- Clarinet 3.11
+
+---
 
 ## Roadmap
 
 ### Phase 1 - Core System (Completed)
-- Raffle Smart Contract logic.
-- Verifiable randomness integration.
-- Round management system.
-- Basic frontend integration.
+- [x] Ticket purchase functionality
+- [x] VRF-based winner selection
+- [x] Prize distribution logic
+- [x] Admin controls
 
-### Phase 2 - Advanced Features (Completed)
-- Multi-ticket purchase support.
-- Unique player tracking.
-- WalletConnect integration.
-- Admin dashboard.
+### Phase 2 - Multi-Ticket Support (Completed)
+- [x] Buy multiple tickets in one transaction
+- [x] Unique player counting
+- [x] Gas optimization
 
-### Phase 3 - Deployment (Completed)
-- Upgrade to Clarity 4.
-- Testnet validation.
-- Mainnet deployment.
+### Phase 3 - Frontend (Completed)
+- [x] Next.js application
+- [x] WalletConnect integration
+- [x] Real-time jackpot display
+- [x] Responsive design
 
-### Phase 4 - Ecosystem Expansion
-- Social sharing for wins.
-- Automatic round scheduling.
-- Secondary rewards for participants.
+### Phase 4 - Mainnet Deployment (Completed)
+- [x] Clarity 4 migration
+- [x] Mainnet contract deployment
+- [x] Vercel frontend deployment
 
-## Mainnet Deployment
-
-The Daily Stacks Raffle smart contracts are successfully deployed and verified on Stacks Mainnet.
-
-Deployer Address: SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T
-
-### Deployed Contracts
-```
-SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2
-```
-
-### Deployment Details
-- Network: Stacks Mainnet
-- Deployment Fee: 10
-- Deployment Date: December 28, 2025
-- Contract Version: Clarity 4 (SIP-033)
-- Status: All contracts confirmed on-chain
-
-### Explorer Link
-View on Stacks Explorer: [https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2?chain=mainnet](https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2?chain=mainnet)
-
-## Technical Start Guide
-
-### Prerequisites
-- Node.js 18 or higher.
-- Clarinet CLI for contract development.
-- Stacks wallet for testing.
-
-### Local Development
-1. Clone the repository:
-   git clone https://github.com/unclekaldoteth/stacks-daily-raffle.git
-2. Install dependencies:
-   cd frontend && npm install
-3. Start the dev server:
-   npm run dev
-
-### Contract Testing
-1. Run contract checks:
-   clarinet check
-2. Launch local console:
-   clarinet console
+---
 
 ## Contributing
-Contributions are welcome. Please open an issue or submit a pull request for any improvements.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
 
 ## License
-This project is licensed under the MIT License.
 
+MIT License - see LICENSE file for details.
+
+---
+
+## Acknowledgments
+
+- Stacks Foundation for the blockchain infrastructure
+- Hiro for Clarinet and developer tools
+- WalletConnect for mobile wallet protocol
