@@ -42,7 +42,7 @@ Winner selection uses on-chain VRF for verifiable randomness. All ticket purchas
 ### Smart Contracts (Clarity 4)
 | Contract | Description |
 |----------|-------------|
-| **daily-raffle-v2** | Main raffle logic, ticket sales, VRF winner selection |
+| **daily-raffle-v3** | Main raffle logic, ticket sales, VRF winner selection |
 
 ### Frontend (Next.js)
 - Modern React UI with real-time updates
@@ -60,14 +60,14 @@ Frontend: https://stacks-daily-raffle.vercel.app
 ## Mainnet Deployment
 
 ### Smart Contract Live on Stacks Mainnet
-The daily-raffle-v2 contract is successfully deployed and verified on Stacks Mainnet.
+The daily-raffle-v3 contract is successfully deployed and verified on Stacks Mainnet.
 
 **Deployer Address:** `SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T`
 
 ### Deployed Contract
 | Contract Name | Description |
 |--------------|-------------|
-| **daily-raffle-v2** | Raffle system with multi-ticket support and VRF |
+| **daily-raffle-v3** | Raffle system with multi-ticket support and VRF |
 
 ### Deployment Details
 - **Network:** Stacks Mainnet
@@ -79,12 +79,12 @@ The daily-raffle-v2 contract is successfully deployed and verified on Stacks Mai
 
 ### Explorer Links
 View contract on Stacks Explorer:
-https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2?chain=mainnet
+https://explorer.hiro.so/address/SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v3?chain=mainnet
 
 ### Contract Address for Integration
 ```clarity
 ;; Main Raffle Contract
-SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2
+SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v3
 ```
 
 ---
@@ -95,7 +95,7 @@ SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T.daily-raffle-v2
 | Function | Description |
 |----------|-------------|
 | `buy-ticket` | Purchase a single ticket for the current round |
-| `buy-tickets` | Purchase multiple tickets (1-100) in one transaction |
+| `buy-tickets` | Purchase multiple tickets (1-50) in one transaction |
 | `draw-winner` | Trigger the VRF-based winner selection (admin only) |
 | `claim-prize` | Claim winnings for a completed round |
 

@@ -5,11 +5,11 @@ authors = []
 telemetry = false
 cache_dir = "./.cache"
 
-# Only include the v2 contract for deployment
-[contracts.daily-raffle-v2]
-path = "contracts/daily-raffle-v2.clar"
-clarity_version = 4
-epoch = 3.3
+# V2 already deployed to mainnet - DO NOT INCLUDE IN DEPLOYMENT
+# [contracts.daily-raffle-v2]
+# path = "contracts/daily-raffle-v2.clar"
+# clarity_version = 4
+# epoch = 3.3
 
 # V3 - Fixed version with correct stx-transfer? sender and 50 ticket limit (Clarity 4)
 [contracts.daily-raffle-v3]

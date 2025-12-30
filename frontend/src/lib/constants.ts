@@ -1,6 +1,6 @@
 // Contract configuration - Deployed to mainnet
 export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || 'SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T';
-export const CONTRACT_NAME = 'daily-raffle-v2';
+export const CONTRACT_NAME = 'daily-raffle-v3';
 
 // Network configuration - Centralized for all components
 export const NETWORK = process.env.NEXT_PUBLIC_STACKS_NETWORK || 'mainnet';
