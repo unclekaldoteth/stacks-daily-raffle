@@ -1,13 +1,5 @@
-'use client';
-
 import React, { useState } from 'react';
 import { openContractCall } from '@stacks/connect';
-import {
-    uintCV,
-    PostConditionMode,
-    Pc,
-    FungibleConditionCode,
-} from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
 import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, TICKET_PRICE_STX } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
@@ -40,29 +32,33 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
         setError(null);
 
         try {
-            // Calculate total STX to spend
-            const totalMicroSTX = TICKET_PRICE_MICRO * quantity;
+            // Fetch pre-calculated transaction options from server
+            // This avoids using @stacks/transactions (and eval) on the client
+            const response = await fetch('/api/tx-options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'buy-ticket',
+                    quantity,
+                    userAddress,
+                    pricePerTicket: TICKET_PRICE_MICRO
+                })
+            });
 
-            // Use Allow mode with a protective post-condition
-            // This ensures the user doesn't send more than expected
-            // Using willSendLte (less than or equal) is safer than willSendEq
-            // because it allows for slight variations and doesn't fail on exact match issues
-            const postConditions = [
-                Pc.principal(userAddress)
-                    .willSendLte(totalMicroSTX)
-                    .ustx()
-            ];
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Failed to prepare transaction');
+            }
 
-            const contractCallOptions = {
+            const txOptions = await response.json();
+
+            // txOptions contains: functionName, functionArgs (hex), postConditions (JSON), postConditionMode
+            // openContractCall handles these standard formats
+            await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,
                 contractName: CONTRACT_NAME,
-                functionName: quantity === 1 ? 'buy-ticket' : 'buy-tickets',
-                functionArgs: quantity === 1 ? [] : [uintCV(quantity)],
-                // Use Allow mode - the post-condition still protects the user
-                // from sending MORE than expected, but won't fail on exact amounts
-                postConditionMode: PostConditionMode.Allow,
-                postConditions,
+                ...txOptions,
                 onFinish: (data: { txId: string }) => {
                     console.log('Transaction submitted:', data);
                     onSuccess?.();
@@ -70,13 +66,11 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
                 onCancel: () => {
                     console.log('Transaction cancelled');
                 },
-            };
-
-            await openContractCall(contractCallOptions);
+            });
         } catch (err) {
             console.error('Error buying ticket:', err);
             if (!isUserCancellation(err)) {
-                setError(getContractErrorMessage(err));
+                setError(typeof err === 'string' ? err : getContractErrorMessage(err));
             }
         } finally {
             setIsProcessing(false);
