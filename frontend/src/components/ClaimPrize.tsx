@@ -42,7 +42,9 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
                 contractName: CONTRACT_NAME,
                 functionName: 'claim-prize',
                 functionArgs: [],
-                postConditionMode: PostConditionMode.Allow,
+                // Use Deny mode with empty conditions - user is RECEIVING STX, not sending
+                // This removes the "can transfer any of your assets" wallet warning
+                postConditionMode: PostConditionMode.Deny,
                 postConditions: [],
                 onFinish: (data) => {
                     console.log('Claim transaction submitted:', data);

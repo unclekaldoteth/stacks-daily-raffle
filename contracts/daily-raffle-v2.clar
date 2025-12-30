@@ -267,7 +267,8 @@
         (winner-prize (- pot-balance dev-fee))
       )
       
-      (try! (as-contract? ((with-stx dev-fee)) (unwrap-panic (stx-transfer? dev-fee tx-sender CONTRACT-OWNER))))
+      ;; Transfer dev fee from contract to owner
+      (try! (as-contract? ((with-stx dev-fee)) (unwrap-panic (stx-transfer? dev-fee current-contract CONTRACT-OWNER))))
       
       (map-set Unclaimed-Prizes winner
         { amount: winner-prize, round: round }
@@ -315,7 +316,9 @@
       (prize-amount (get amount prize-info))
       (prize-round (get round prize-info))
     )
-    (try! (as-contract? ((with-stx prize-amount)) (unwrap-panic (stx-transfer? prize-amount tx-sender contract-caller))))
+    ;; Transfer STX from contract to the winner (contract-caller)
+    ;; as-contract? allows contract to transfer its own STX; unwrap-panic the inner response
+    (try! (as-contract? ((with-stx prize-amount)) (unwrap-panic (stx-transfer? prize-amount current-contract contract-caller))))
     
     (map-delete Unclaimed-Prizes tx-sender)
     
