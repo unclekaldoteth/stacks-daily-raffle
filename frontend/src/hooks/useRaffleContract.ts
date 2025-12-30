@@ -1,13 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-    fetchCallReadOnlyFunction,
-    cvToValue,
-    principalCV,
-} from '@stacks/transactions';
-import { STACKS_TESTNET, STACKS_MAINNET, StacksNetwork } from '@stacks/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, NETWORK } from '@/lib/constants';
+import { cvToValue, deserializeCV, serializeCV, principalCV } from '@stacks/transactions';
+import { CONTRACT_ADDRESS, CONTRACT_NAME } from '@/lib/constants';
 
 interface RaffleData {
     currentRound: number;
@@ -37,152 +32,123 @@ const defaultRaffleData: RaffleData = {
     unclaimedPrize: null,
 };
 
+// Helper function to call read-only contract functions via our server-side proxy
+async function callReadOnly(functionName: string, functionArgs: string[] = []): Promise<unknown> {
+    const response = await fetch('/api/contract', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            functionName,
+            functionArgs,
+            senderAddress: CONTRACT_ADDRESS,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to call ${functionName}: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.okay && data.result) {
+        // Deserialize the Clarity value from hex
+        // data.result is a hex string starting with "0x"
+        const hexString = data.result.startsWith('0x') ? data.result.slice(2) : data.result;
+        const bytes = new Uint8Array(hexString.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16)));
+        const cv = deserializeCV(bytes);
+        return cvToValue(cv);
+    }
+
+    throw new Error(`Contract call failed: ${JSON.stringify(data)}`);
+}
+
+// Helper to convert Uint8Array to hex string
+function bytesToHex(bytes: Uint8Array): string {
+    return Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+// Helper to serialize principal to hex for API call
+function serializePrincipalArg(address: string): string {
+    const cv = principalCV(address);
+    const serialized = serializeCV(cv);
+    // serializeCV returns hex string, ensure it's clean (no 0x prefix for API)
+    return typeof serialized === 'string'
+        ? (serialized.startsWith('0x') ? serialized.slice(2) : serialized)
+        : bytesToHex(serialized as unknown as Uint8Array);
+}
+
 export function useRaffleContract(userAddress: string | null) {
     const [raffleData, setRaffleData] = useState<RaffleData>(defaultRaffleData);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    const network: StacksNetwork = NETWORK === 'mainnet' ? STACKS_MAINNET : STACKS_TESTNET;
 
     const fetchReadOnlyData = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
 
-            // Fetch current round
-            const currentRoundResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-current-round',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const currentRound = Number(cvToValue(currentRoundResult));
+            // Fetch all basic contract data in parallel
+            const [
+                currentRoundValue,
+                potBalanceValue,
+                ticketsSoldValue,
+                uniquePlayersValue,
+                ticketPriceValue,
+                estimatedPrizeValue,
+                canDrawValue,
+                blocksUntilDrawValue,
+                lastWinnerValue,
+            ] = await Promise.all([
+                callReadOnly('get-current-round'),
+                callReadOnly('get-pot-balance'),
+                callReadOnly('get-tickets-sold'),
+                callReadOnly('get-unique-players'),
+                callReadOnly('get-ticket-price'),
+                callReadOnly('get-estimated-prize'),
+                callReadOnly('can-draw'),
+                callReadOnly('get-blocks-until-draw'),
+                callReadOnly('get-last-winner'),
+            ]);
 
-            // Fetch pot balance
-            const potBalanceResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-pot-balance',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const potBalance = BigInt(cvToValue(potBalanceResult));
-
-            // Fetch tickets sold
-            const ticketsSoldResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-tickets-sold',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const ticketsSold = Number(cvToValue(ticketsSoldResult));
-
-            // Fetch unique players
-            const uniquePlayersResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-unique-players',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const uniquePlayers = Number(cvToValue(uniquePlayersResult));
-
-            // Fetch ticket price
-            const ticketPriceResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-ticket-price',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const ticketPrice = BigInt(cvToValue(ticketPriceResult));
-
-            // Fetch estimated prize
-            const estimatedPrizeResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-estimated-prize',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const estimatedPrize = BigInt(cvToValue(estimatedPrizeResult));
-
-            // Fetch can draw
-            const canDrawResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'can-draw',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const canDraw = cvToValue(canDrawResult) as boolean;
-
-            // Fetch blocks until draw
-            const blocksUntilDrawResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-blocks-until-draw',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const blocksUntilDraw = Number(cvToValue(blocksUntilDrawResult));
-
-            // Fetch last winner
-            const lastWinnerResult = await fetchCallReadOnlyFunction({
-                contractAddress: CONTRACT_ADDRESS,
-                contractName: CONTRACT_NAME,
-                functionName: 'get-last-winner',
-                functionArgs: [],
-                network,
-                senderAddress: CONTRACT_ADDRESS,
-            });
-            const lastWinnerValue = cvToValue(lastWinnerResult);
+            const currentRound = Number(currentRoundValue);
+            const potBalance = BigInt(potBalanceValue as string | number);
+            const ticketsSold = Number(ticketsSoldValue);
+            const uniquePlayers = Number(uniquePlayersValue);
+            const ticketPrice = BigInt(ticketPriceValue as string | number);
+            const estimatedPrize = BigInt(estimatedPrizeValue as string | number);
+            const canDraw = canDrawValue as boolean;
+            const blocksUntilDraw = Number(blocksUntilDrawValue);
             const lastWinner = lastWinnerValue ? String(lastWinnerValue) : null;
 
-            // Fetch user tickets if connected
+            // Fetch user-specific data if connected
             let userTickets = 0;
             let unclaimedPrize: { amount: bigint; round: number } | null = null;
 
             if (userAddress) {
                 try {
-                    const userTicketsResult = await fetchCallReadOnlyFunction({
-                        contractAddress: CONTRACT_ADDRESS,
-                        contractName: CONTRACT_NAME,
-                        functionName: 'get-user-ticket-count',
-                        functionArgs: [principalCV(userAddress)],
-                        network,
-                        senderAddress: CONTRACT_ADDRESS,
-                    });
-                    userTickets = Number(cvToValue(userTicketsResult));
+                    const userTicketsValue = await callReadOnly(
+                        'get-user-ticket-count',
+                        [serializePrincipalArg(userAddress)]
+                    );
+                    userTickets = Number(userTicketsValue);
                 } catch (e) {
                     console.log('Could not fetch user tickets:', e);
                 }
 
-                // Fetch unclaimed prize for user
                 try {
-                    const unclaimedPrizeResult = await fetchCallReadOnlyFunction({
-                        contractAddress: CONTRACT_ADDRESS,
-                        contractName: CONTRACT_NAME,
-                        functionName: 'get-unclaimed-prize',
-                        functionArgs: [principalCV(userAddress)],
-                        network,
-                        senderAddress: CONTRACT_ADDRESS,
-                    });
-                    const prizeValue = cvToValue(unclaimedPrizeResult);
+                    const prizeValue = await callReadOnly(
+                        'get-unclaimed-prize',
+                        [serializePrincipalArg(userAddress)]
+                    );
                     if (prizeValue && typeof prizeValue === 'object' && 'amount' in prizeValue) {
+                        const prize = prizeValue as { amount: string | number; round: string | number };
                         unclaimedPrize = {
-                            amount: BigInt(prizeValue.amount as string | number),
-                            round: Number(prizeValue.round),
+                            amount: BigInt(prize.amount),
+                            round: Number(prize.round),
                         };
                     }
                 } catch (e) {
@@ -209,7 +175,7 @@ export function useRaffleContract(userAddress: string | null) {
         } finally {
             setIsLoading(false);
         }
-    }, [userAddress, network]);
+    }, [userAddress]);
 
     // Initial fetch
     useEffect(() => {
@@ -229,3 +195,6 @@ export function useRaffleContract(userAddress: string | null) {
         refetch: fetchReadOnlyData,
     };
 }
+
+// Re-export for backwards compatibility
+export { CONTRACT_ADDRESS, CONTRACT_NAME };
