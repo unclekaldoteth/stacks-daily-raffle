@@ -25,6 +25,13 @@ export const BPS_DENOMINATOR = BigInt(10000);
 // Minimum blocks before draw is allowed
 export const MIN_BLOCKS_BEFORE_DRAW = 10;
 
+// Shared PostConditionMode enum to avoid importing @stacks/transactions in every component
+// This helps avoid CSP eval() issues in read-only components
+export enum PostConditionMode {
+  Allow = 0x01,
+  Deny = 0x02,
+}
+
 // Format STX amount from microSTX
 export function formatSTX(microSTX: number | bigint): string {
   const stx = Number(microSTX) / 1000000;

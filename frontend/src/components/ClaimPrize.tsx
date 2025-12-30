@@ -2,9 +2,8 @@
 
 import React, { useState } from 'react';
 import { openContractCall } from '@stacks/connect';
-import { PostConditionMode } from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, formatSTX } from '@/lib/constants';
+import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, formatSTX, PostConditionMode } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
 import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
 
