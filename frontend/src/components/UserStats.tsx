@@ -1,12 +1,18 @@
 'use client';
 
 import React from 'react';
-import { formatAddress } from '@/lib/constants';
+import { formatAddress, formatSTX } from '@/lib/constants';
+
+interface LastWinnerInfo {
+    address: string;
+    prizeAmount: bigint;
+    round: number;
+}
 
 interface UserStatsProps {
     userAddress: string | null;
     userTickets: number;
-    lastWinner: string | null;
+    lastWinner: LastWinnerInfo | null;
     blocksUntilDraw: number;
     canDraw: boolean;
 }
@@ -80,17 +86,27 @@ export function UserStats({
                             Last Round Winner
                         </h3>
                         {lastWinner ? (
-                            <div className="flex flex-col md:flex-row items-center gap-2">
-                                <span className="text-2xl font-mono text-green-400 break-all">
-                                    {formatAddress(lastWinner)}
-                                </span>
-                                <button
-                                    onClick={() => navigator.clipboard.writeText(lastWinner)}
-                                    className="text-gray-500 hover:text-white transition-colors p-2"
-                                    title="Copy address"
-                                >
-                                    📋
-                                </button>
+                            <div className="space-y-2">
+                                <div className="flex flex-col md:flex-row items-center gap-2">
+                                    <span className="text-2xl font-mono text-green-400 break-all">
+                                        {formatAddress(lastWinner.address)}
+                                    </span>
+                                    <button
+                                        onClick={() => navigator.clipboard.writeText(lastWinner.address)}
+                                        className="text-gray-500 hover:text-white transition-colors p-2"
+                                        title="Copy address"
+                                    >
+                                        📋
+                                    </button>
+                                </div>
+                                <div className="flex flex-col md:flex-row items-center gap-3 text-lg">
+                                    <span className="text-yellow-400 font-bold">
+                                        Won {formatSTX(lastWinner.prizeAmount)} STX
+                                    </span>
+                                    <span className="text-gray-500 text-sm">
+                                        (Round #{lastWinner.round})
+                                    </span>
+                                </div>
                             </div>
                         ) : (
                             <span className="text-2xl text-gray-600">

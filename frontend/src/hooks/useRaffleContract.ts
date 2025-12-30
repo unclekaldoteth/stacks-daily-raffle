@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { cvToValue, deserializeCV, serializeCV, principalCV } from '@stacks/transactions';
+import { cvToValue, deserializeCV, serializeCV, principalCV, uintCV } from '@stacks/transactions';
 import { CONTRACT_ADDRESS, CONTRACT_NAME } from '@/lib/constants';
+
+interface LastWinnerInfo {
+    address: string;
+    prizeAmount: bigint;
+    round: number;
+}
 
 interface RaffleData {
     currentRound: number;
@@ -10,7 +16,7 @@ interface RaffleData {
     ticketsSold: number;
     uniquePlayers: number;
     userTickets: number;
-    lastWinner: string | null;
+    lastWinner: LastWinnerInfo | null;
     canDraw: boolean;
     blocksUntilDraw: number;
     estimatedPrize: bigint;
@@ -31,6 +37,13 @@ const defaultRaffleData: RaffleData = {
     ticketPrice: BigInt(1000000),
     unclaimedPrize: null,
 };
+
+// Helper to convert Uint8Array to hex string
+function bytesToHex(bytes: Uint8Array): string {
+    return Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
 
 // Helper function to call read-only contract functions via our server-side proxy
 async function callReadOnly(functionName: string, functionArgs: string[] = []): Promise<unknown> {
@@ -64,13 +77,6 @@ async function callReadOnly(functionName: string, functionArgs: string[] = []): 
     throw new Error(`Contract call failed: ${JSON.stringify(data)}`);
 }
 
-// Helper to convert Uint8Array to hex string
-function bytesToHex(bytes: Uint8Array): string {
-    return Array.from(bytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-}
-
 // Helper to serialize principal to hex for API call
 function serializePrincipalArg(address: string): string {
     const cv = principalCV(address);
@@ -79,6 +85,47 @@ function serializePrincipalArg(address: string): string {
     return typeof serialized === 'string'
         ? (serialized.startsWith('0x') ? serialized.slice(2) : serialized)
         : bytesToHex(serialized as unknown as Uint8Array);
+}
+
+// Helper to serialize uint to hex for API call
+function serializeUintArg(value: number): string {
+    const cv = uintCV(value);
+    const serialized = serializeCV(cv);
+    return typeof serialized === 'string'
+        ? (serialized.startsWith('0x') ? serialized.slice(2) : serialized)
+        : bytesToHex(serialized as unknown as Uint8Array);
+}
+
+// Helper to extract principal address from optional clarity value
+function extractPrincipal(value: unknown): string | null {
+    if (!value) return null;
+
+    // Handle direct string (already a principal)
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    // Handle { type: 'some', value: 'SP...' } or similar structures
+    if (typeof value === 'object' && value !== null) {
+        const obj = value as Record<string, unknown>;
+
+        // Check for 'value' property (optional type)
+        if ('value' in obj) {
+            const innerValue = obj.value;
+            if (typeof innerValue === 'string') {
+                return innerValue;
+            }
+            // Nested object with value
+            if (typeof innerValue === 'object' && innerValue !== null) {
+                const nested = innerValue as Record<string, unknown>;
+                if ('value' in nested && typeof nested.value === 'string') {
+                    return nested.value;
+                }
+            }
+        }
+    }
+
+    return null;
 }
 
 export function useRaffleContract(userAddress: string | null) {
@@ -101,7 +148,6 @@ export function useRaffleContract(userAddress: string | null) {
                 estimatedPrizeValue,
                 canDrawValue,
                 blocksUntilDrawValue,
-                lastWinnerValue,
             ] = await Promise.all([
                 callReadOnly('get-current-round'),
                 callReadOnly('get-pot-balance'),
@@ -111,7 +157,6 @@ export function useRaffleContract(userAddress: string | null) {
                 callReadOnly('get-estimated-prize'),
                 callReadOnly('can-draw'),
                 callReadOnly('get-blocks-until-draw'),
-                callReadOnly('get-last-winner'),
             ]);
 
             const currentRound = Number(currentRoundValue);
@@ -122,7 +167,36 @@ export function useRaffleContract(userAddress: string | null) {
             const estimatedPrize = BigInt(estimatedPrizeValue as string | number);
             const canDraw = canDrawValue as boolean;
             const blocksUntilDraw = Number(blocksUntilDrawValue);
-            const lastWinner = lastWinnerValue ? String(lastWinnerValue) : null;
+
+            // Fetch last round info if there's a previous round
+            let lastWinner: LastWinnerInfo | null = null;
+            if (currentRound > 1) {
+                try {
+                    const lastRoundNum = currentRound - 1;
+                    const lastRoundInfo = await callReadOnly(
+                        'get-round-info',
+                        [serializeUintArg(lastRoundNum)]
+                    );
+
+                    if (lastRoundInfo && typeof lastRoundInfo === 'object') {
+                        const roundData = lastRoundInfo as Record<string, unknown>;
+                        const winnerValue = roundData.winner;
+                        const prizeValue = roundData['prize-amount'] || roundData.prizeAmount || roundData['prize_amount'];
+
+                        const winnerAddress = extractPrincipal(winnerValue);
+
+                        if (winnerAddress) {
+                            lastWinner = {
+                                address: winnerAddress,
+                                prizeAmount: BigInt(prizeValue as string | number || 0),
+                                round: lastRoundNum,
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not fetch last round info:', e);
+                }
+            }
 
             // Fetch user-specific data if connected
             let userTickets = 0;
@@ -198,3 +272,4 @@ export function useRaffleContract(userAddress: string | null) {
 
 // Re-export for backwards compatibility
 export { CONTRACT_ADDRESS, CONTRACT_NAME };
+export type { LastWinnerInfo, RaffleData };
