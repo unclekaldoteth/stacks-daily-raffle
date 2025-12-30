@@ -175,7 +175,7 @@ export default function Home() {
             Powered by <span className="text-orange-400">Bitcoin</span>
           </p>
           <p className="text-gray-600 text-xs mt-2">
-            This is a demo application on testnet. Please gamble responsibly.
+            This is a demo application on mainnet. Please gamble responsibly.
           </p>
         </div>
       </footer>
