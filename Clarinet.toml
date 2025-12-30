@@ -11,6 +11,12 @@ path = "contracts/daily-raffle-v2.clar"
 clarity_version = 4
 epoch = 3.3
 
+# V3 - Fixed version with correct stx-transfer? sender and 50 ticket limit (Clarity 3)
+[contracts.daily-raffle-v3]
+path = "contracts/daily-raffle-v3.clar"
+clarity_version = 3
+epoch = 3.0
+
 [repl]
 costs_version = 2
 parser_version = 2
