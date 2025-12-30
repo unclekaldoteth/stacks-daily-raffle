@@ -10,10 +10,21 @@ const nextConfig: NextConfig = {
     '@stacks/auth',
   ],
 
-  // Set Content Security Policy to allow eval() for Stacks libraries
-
-
-  // Use Webpack for production builds (Turbopack has issues with @stacks dynamic imports)
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            // Permissive CSP to ensure all resources load while explicitly allowing unsafe-eval
+            // This enables @stacks dependencies to function without blocking images, fonts, or styles
+            value: "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; script-src * data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src * data: blob: 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src * data: blob:; style-src * data: blob: 'unsafe-inline'; font-src * data: blob: 'unsafe-inline';",
+          },
+        ],
+      },
+    ];
+  },  // Use Webpack for production builds (Turbopack has issues with @stacks dynamic imports)
   // Note: Turbopack is only used in dev mode by default
 
   // Webpack configuration to properly handle @stacks packages
