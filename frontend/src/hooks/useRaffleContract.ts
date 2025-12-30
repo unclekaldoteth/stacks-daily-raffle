@@ -96,8 +96,25 @@ function serializeUintArg(value: number): string {
         : bytesToHex(serialized as unknown as Uint8Array);
 }
 
+// Helper to unwrap Clarity optional values
+// cvToValue returns { value: innerData } for (some ...) and null for none
+function unwrapOptional<T>(value: unknown): T | null {
+    if (value === null || value === undefined) return null;
+
+    // If it's an object with a 'value' property, unwrap it
+    if (typeof value === 'object' && value !== null && 'value' in value) {
+        const obj = value as { value: T };
+        return obj.value;
+    }
+
+    // If it's already the inner type, return as-is
+    return value as T;
+}
+
 // Helper to extract principal address from optional clarity value
 function extractPrincipal(value: unknown): string | null {
+    console.log('extractPrincipal input:', JSON.stringify(value, null, 2));
+
     if (!value) return null;
 
     // Handle direct string (already a principal)
@@ -105,17 +122,17 @@ function extractPrincipal(value: unknown): string | null {
         return value;
     }
 
-    // Handle { type: 'some', value: 'SP...' } or similar structures
+    // Handle optional wrapper: { value: 'SP...' } or { value: { value: 'SP...' } }
     if (typeof value === 'object' && value !== null) {
         const obj = value as Record<string, unknown>;
 
-        // Check for 'value' property (optional type)
+        // Check for 'value' property (optional type from cvToValue)
         if ('value' in obj) {
             const innerValue = obj.value;
             if (typeof innerValue === 'string') {
                 return innerValue;
             }
-            // Nested object with value
+            // Nested object with value (double-wrapped optional)
             if (typeof innerValue === 'object' && innerValue !== null) {
                 const nested = innerValue as Record<string, unknown>;
                 if ('value' in nested && typeof nested.value === 'string') {
@@ -126,6 +143,62 @@ function extractPrincipal(value: unknown): string | null {
     }
 
     return null;
+}
+
+// Helper to extract prize data from optional clarity value
+function extractPrizeData(value: unknown): { amount: bigint; round: number } | null {
+    console.log('extractPrizeData input:', JSON.stringify(value, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v, 2));
+
+    if (!value) return null;
+
+    // Unwrap the optional first
+    const unwrapped = unwrapOptional<Record<string, unknown>>(value);
+    if (!unwrapped) return null;
+
+    console.log('extractPrizeData unwrapped:', JSON.stringify(unwrapped, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v, 2));
+
+    // Now check for amount and round in the unwrapped data
+    // Handle different possible key formats from cvToValue
+    const amount = unwrapped.amount || unwrapped['amount'];
+    const round = unwrapped.round || unwrapped['round'];
+
+    if (amount !== undefined && round !== undefined) {
+        return {
+            amount: BigInt(amount as string | number),
+            round: Number(round),
+        };
+    }
+
+    return null;
+}
+
+// Helper to extract round data including winner and prize
+function extractRoundData(value: unknown): { winner: string | null; prizeAmount: bigint } | null {
+    console.log('extractRoundData input:', JSON.stringify(value, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v, 2));
+
+    if (!value) return null;
+
+    // Unwrap the optional first (get-round-info returns optional)
+    const unwrapped = unwrapOptional<Record<string, unknown>>(value);
+    if (!unwrapped) return null;
+
+    console.log('extractRoundData unwrapped:', JSON.stringify(unwrapped, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v, 2));
+
+    // Extract winner (which is also optional within the round data)
+    const winnerValue = unwrapped.winner || unwrapped['winner'];
+    const winner = extractPrincipal(winnerValue);
+
+    // Extract prize-amount (handle different key formats)
+    const prizeValue = unwrapped['prize-amount'] || unwrapped.prizeAmount || unwrapped['prize_amount'] || 0;
+
+    return {
+        winner,
+        prizeAmount: BigInt(prizeValue as string | number),
+    };
 }
 
 export function useRaffleContract(userAddress: string | null) {
@@ -178,20 +251,16 @@ export function useRaffleContract(userAddress: string | null) {
                         [serializeUintArg(lastRoundNum)]
                     );
 
-                    if (lastRoundInfo && typeof lastRoundInfo === 'object') {
-                        const roundData = lastRoundInfo as Record<string, unknown>;
-                        const winnerValue = roundData.winner;
-                        const prizeValue = roundData['prize-amount'] || roundData.prizeAmount || roundData['prize_amount'];
+                    console.log('Last round info raw:', JSON.stringify(lastRoundInfo, (_, v) =>
+                        typeof v === 'bigint' ? v.toString() : v, 2));
 
-                        const winnerAddress = extractPrincipal(winnerValue);
-
-                        if (winnerAddress) {
-                            lastWinner = {
-                                address: winnerAddress,
-                                prizeAmount: BigInt(prizeValue as string | number || 0),
-                                round: lastRoundNum,
-                            };
-                        }
+                    const roundData = extractRoundData(lastRoundInfo);
+                    if (roundData && roundData.winner) {
+                        lastWinner = {
+                            address: roundData.winner,
+                            prizeAmount: roundData.prizeAmount,
+                            round: lastRoundNum,
+                        };
                     }
                 } catch (e) {
                     console.log('Could not fetch last round info:', e);
@@ -218,13 +287,12 @@ export function useRaffleContract(userAddress: string | null) {
                         'get-unclaimed-prize',
                         [serializePrincipalArg(userAddress)]
                     );
-                    if (prizeValue && typeof prizeValue === 'object' && 'amount' in prizeValue) {
-                        const prize = prizeValue as { amount: string | number; round: string | number };
-                        unclaimedPrize = {
-                            amount: BigInt(prize.amount),
-                            round: Number(prize.round),
-                        };
-                    }
+
+                    console.log('Unclaimed prize raw:', JSON.stringify(prizeValue, (_, v) =>
+                        typeof v === 'bigint' ? v.toString() : v, 2));
+
+                    unclaimedPrize = extractPrizeData(prizeValue);
+                    console.log('Unclaimed prize parsed:', unclaimedPrize);
                 } catch (e) {
                     console.log('Could not fetch unclaimed prize:', e);
                 }
