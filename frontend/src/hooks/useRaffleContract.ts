@@ -46,6 +46,57 @@ interface FunctionArg {
     value: string | number;
 }
 
+// Helper to extract a primitive value from Clarity value objects
+// cvToValue can return objects like { value: "123" } or just primitives
+function extractPrimitive(value: unknown): string | number | boolean | null {
+    if (value === null || value === undefined) return null;
+
+    // Already a primitive
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return value;
+    }
+
+    // Object with value property (Clarity some/ok types)
+    if (typeof value === 'object' && value !== null) {
+        const obj = value as Record<string, unknown>;
+        if ('value' in obj) {
+            return extractPrimitive(obj.value);
+        }
+    }
+
+    return null;
+}
+
+// Safe BigInt conversion that handles Clarity value objects
+function toBigInt(value: unknown): bigint {
+    const primitive = extractPrimitive(value);
+    if (primitive === null) return BigInt(0);
+    if (typeof primitive === 'boolean') return BigInt(primitive ? 1 : 0);
+    try {
+        return BigInt(primitive);
+    } catch {
+        console.error('Failed to convert to BigInt:', value);
+        return BigInt(0);
+    }
+}
+
+// Safe Number conversion that handles Clarity value objects  
+function toNumber(value: unknown): number {
+    const primitive = extractPrimitive(value);
+    if (primitive === null) return 0;
+    if (typeof primitive === 'boolean') return primitive ? 1 : 0;
+    return Number(primitive);
+}
+
+// Safe boolean extraction
+function toBoolean(value: unknown): boolean {
+    const primitive = extractPrimitive(value);
+    if (typeof primitive === 'boolean') return primitive;
+    if (primitive === null) return false;
+    return Boolean(primitive);
+}
+
+
 // Helper function to call read-only contract functions via our server-side proxy
 // Server handles ALL serialization/deserialization to avoid CSP eval() issues
 async function callReadOnly(functionName: string, args: FunctionArg[] = []): Promise<unknown> {
@@ -140,8 +191,8 @@ function extractPrizeData(value: unknown): { amount: bigint; round: number } | n
 
     if (amount !== undefined && round !== undefined) {
         return {
-            amount: BigInt(amount as string | number),
-            round: Number(round),
+            amount: toBigInt(amount),
+            round: toNumber(round),
         };
     }
 
@@ -168,7 +219,7 @@ function extractRoundData(value: unknown): { winner: string | null; prizeAmount:
 
     return {
         winner,
-        prizeAmount: BigInt(prizeValue as string | number),
+        prizeAmount: toBigInt(prizeValue),
     };
 }
 
@@ -203,14 +254,14 @@ export function useRaffleContract(userAddress: string | null) {
                 callReadOnly('get-blocks-until-draw'),
             ]);
 
-            const currentRound = Number(currentRoundValue);
-            const potBalance = BigInt(potBalanceValue as string | number);
-            const ticketsSold = Number(ticketsSoldValue);
-            const uniquePlayers = Number(uniquePlayersValue);
-            const ticketPrice = BigInt(ticketPriceValue as string | number);
-            const estimatedPrize = BigInt(estimatedPrizeValue as string | number);
-            const canDraw = canDrawValue as boolean;
-            const blocksUntilDraw = Number(blocksUntilDrawValue);
+            const currentRound = toNumber(currentRoundValue);
+            const potBalance = toBigInt(potBalanceValue);
+            const ticketsSold = toNumber(ticketsSoldValue);
+            const uniquePlayers = toNumber(uniquePlayersValue);
+            const ticketPrice = toBigInt(ticketPriceValue);
+            const estimatedPrize = toBigInt(estimatedPrizeValue);
+            const canDraw = toBoolean(canDrawValue);
+            const blocksUntilDraw = toNumber(blocksUntilDrawValue);
 
             // Fetch last round info if there's a previous round
             let lastWinner: LastWinnerInfo | null = null;
