@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cvToValue, deserializeCV } from '@stacks/transactions';
+import { cvToValue, deserializeCV, serializeCV, principalCV, uintCV } from '@stacks/transactions';
 
-// Server-side proxy for Hiro API calls to avoid CORS issues
-// Also handles Clarity value deserialization to avoid CSP eval() issues on client
+// Server-side proxy for Hiro API calls
+// Handles ALL Clarity value serialization/deserialization to avoid CSP eval() issues on client
 const HIRO_API_KEY = process.env.NEXT_PUBLIC_HIRO_API_KEY || '55c6a0ca1655831740658ca8e57dcda5';
 const NETWORK = process.env.NEXT_PUBLIC_STACKS_NETWORK || 'mainnet';
 const STACKS_API_URL = NETWORK === 'mainnet'
@@ -12,9 +12,16 @@ const STACKS_API_URL = NETWORK === 'mainnet'
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || 'SP1ZGGS886YCZHMFXJR1EK61ZP34FNWNSX32N685T';
 const CONTRACT_NAME = 'daily-raffle-v2';
 
+// Argument types for serialization
+interface FunctionArg {
+    type: 'principal' | 'uint';
+    value: string | number;
+}
+
 interface ReadOnlyCallRequest {
     functionName: string;
-    functionArgs?: string[];
+    // Now accepts typed arguments instead of pre-serialized hex
+    args?: FunctionArg[];
     senderAddress?: string;
 }
 
@@ -26,6 +33,35 @@ function hexToBytes(hex: string): Uint8Array {
         bytes[i] = parseInt(cleanHex.substr(i * 2, 2), 16);
     }
     return bytes;
+}
+
+// Helper to convert Uint8Array to hex string
+function bytesToHex(bytes: Uint8Array): string {
+    return Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+// Serialize arguments on the server side
+function serializeArg(arg: FunctionArg): string {
+    let cv;
+    switch (arg.type) {
+        case 'principal':
+            cv = principalCV(String(arg.value));
+            break;
+        case 'uint':
+            cv = uintCV(Number(arg.value));
+            break;
+        default:
+            throw new Error(`Unknown argument type: ${arg.type}`);
+    }
+
+    const serialized = serializeCV(cv);
+    // serializeCV can return hex string or Uint8Array depending on version
+    if (typeof serialized === 'string') {
+        return serialized.startsWith('0x') ? serialized.slice(2) : serialized;
+    }
+    return bytesToHex(serialized as unknown as Uint8Array);
 }
 
 // Recursively convert BigInt to string for JSON serialization
@@ -49,11 +85,15 @@ function serializeBigInts(obj: unknown): unknown {
 export async function POST(request: NextRequest) {
     try {
         const body: ReadOnlyCallRequest = await request.json();
-        const { functionName, functionArgs = [], senderAddress = CONTRACT_ADDRESS } = body;
+        const { functionName, args = [], senderAddress = CONTRACT_ADDRESS } = body;
+
+        // Serialize arguments on server side
+        const serializedArgs = args.map(serializeArg);
 
         const url = `${STACKS_API_URL}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`;
 
-        console.log(`[API] Calling ${functionName} with args:`, functionArgs);
+        console.log(`[API] Calling ${functionName} with args:`, args);
+        console.log(`[API] Serialized args:`, serializedArgs);
 
         const response = await fetch(url, {
             method: 'POST',
@@ -63,7 +103,7 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify({
                 sender: senderAddress,
-                arguments: functionArgs,
+                arguments: serializedArgs,
             }),
         });
 
@@ -78,8 +118,7 @@ export async function POST(request: NextRequest) {
 
         const data = await response.json();
 
-        // If the response has a result, deserialize it on the server-side
-        // This avoids CSP eval() issues on the client
+        // Deserialize Clarity value on server side
         if (data.okay && data.result) {
             try {
                 const bytes = hexToBytes(data.result);
@@ -88,15 +127,13 @@ export async function POST(request: NextRequest) {
 
                 console.log(`[API] ${functionName} result:`, JSON.stringify(serializeBigInts(value), null, 2));
 
-                // Return both the raw hex and the deserialized value
                 return NextResponse.json({
                     okay: true,
                     result: data.result,
-                    value: serializeBigInts(value), // Pre-deserialized value (JSON-safe)
+                    value: serializeBigInts(value),
                 });
             } catch (deserializeError) {
                 console.error(`[API] Deserialization error for ${functionName}:`, deserializeError);
-                // Fall back to returning raw data if deserialization fails
                 return NextResponse.json(data);
             }
         }

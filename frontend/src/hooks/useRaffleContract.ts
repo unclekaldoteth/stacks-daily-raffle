@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { serializeCV, principalCV, uintCV } from '@stacks/transactions';
 import { CONTRACT_ADDRESS, CONTRACT_NAME } from '@/lib/constants';
+
+// NO @stacks/transactions imports - all serialization happens on server
+// This avoids CSP eval() errors in production
 
 interface LastWinnerInfo {
     address: string;
@@ -38,16 +40,15 @@ const defaultRaffleData: RaffleData = {
     unclaimedPrize: null,
 };
 
-// Helper to convert Uint8Array to hex string
-function bytesToHex(bytes: Uint8Array): string {
-    return Array.from(bytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+// Argument type for API calls
+interface FunctionArg {
+    type: 'principal' | 'uint';
+    value: string | number;
 }
 
 // Helper function to call read-only contract functions via our server-side proxy
-// The server deserializes Clarity values and returns plain JSON
-async function callReadOnly(functionName: string, functionArgs: string[] = []): Promise<unknown> {
+// Server handles ALL serialization/deserialization to avoid CSP eval() issues
+async function callReadOnly(functionName: string, args: FunctionArg[] = []): Promise<unknown> {
     const response = await fetch('/api/contract', {
         method: 'POST',
         headers: {
@@ -55,7 +56,7 @@ async function callReadOnly(functionName: string, functionArgs: string[] = []): 
         },
         body: JSON.stringify({
             functionName,
-            functionArgs,
+            args,
             senderAddress: CONTRACT_ADDRESS,
         }),
     });
@@ -66,13 +67,11 @@ async function callReadOnly(functionName: string, functionArgs: string[] = []): 
 
     const data = await response.json();
 
-    // The server now returns { okay: true, result: "0x...", value: <deserialized> }
-    // Use the pre-deserialized 'value' field to avoid CSP eval() issues
+    // Server returns pre-deserialized value
     if (data.okay && data.value !== undefined) {
         return data.value;
     }
 
-    // Fallback for error responses
     if (data.error) {
         throw new Error(`Contract call failed: ${data.error}`);
     }
@@ -80,37 +79,16 @@ async function callReadOnly(functionName: string, functionArgs: string[] = []): 
     throw new Error(`Contract call failed: ${JSON.stringify(data)}`);
 }
 
-// Helper to serialize principal to hex for API call
-function serializePrincipalArg(address: string): string {
-    const cv = principalCV(address);
-    const serialized = serializeCV(cv);
-    // serializeCV returns hex string, ensure it's clean (no 0x prefix for API)
-    return typeof serialized === 'string'
-        ? (serialized.startsWith('0x') ? serialized.slice(2) : serialized)
-        : bytesToHex(serialized as unknown as Uint8Array);
-}
-
-// Helper to serialize uint to hex for API call
-function serializeUintArg(value: number): string {
-    const cv = uintCV(value);
-    const serialized = serializeCV(cv);
-    return typeof serialized === 'string'
-        ? (serialized.startsWith('0x') ? serialized.slice(2) : serialized)
-        : bytesToHex(serialized as unknown as Uint8Array);
-}
-
 // Helper to unwrap Clarity optional values
 // cvToValue returns { value: innerData } for (some ...) and null for none
 function unwrapOptional<T>(value: unknown): T | null {
     if (value === null || value === undefined) return null;
 
-    // If it's an object with a 'value' property, unwrap it
     if (typeof value === 'object' && value !== null && 'value' in value) {
         const obj = value as { value: T };
         return obj.value;
     }
 
-    // If it's already the inner type, return as-is
     return value as T;
 }
 
@@ -120,22 +98,18 @@ function extractPrincipal(value: unknown): string | null {
 
     if (!value) return null;
 
-    // Handle direct string (already a principal)
     if (typeof value === 'string') {
         return value;
     }
 
-    // Handle optional wrapper: { value: 'SP...' } or { value: { value: 'SP...' } }
     if (typeof value === 'object' && value !== null) {
         const obj = value as Record<string, unknown>;
 
-        // Check for 'value' property (optional type from cvToValue)
         if ('value' in obj) {
             const innerValue = obj.value;
             if (typeof innerValue === 'string') {
                 return innerValue;
             }
-            // Nested object with value (double-wrapped optional)
             if (typeof innerValue === 'object' && innerValue !== null) {
                 const nested = innerValue as Record<string, unknown>;
                 if ('value' in nested && typeof nested.value === 'string') {
@@ -155,15 +129,12 @@ function extractPrizeData(value: unknown): { amount: bigint; round: number } | n
 
     if (!value) return null;
 
-    // Unwrap the optional first
     const unwrapped = unwrapOptional<Record<string, unknown>>(value);
     if (!unwrapped) return null;
 
     console.log('extractPrizeData unwrapped:', JSON.stringify(unwrapped, (_, v) =>
         typeof v === 'bigint' ? v.toString() : v, 2));
 
-    // Now check for amount and round in the unwrapped data
-    // Handle different possible key formats from cvToValue
     const amount = unwrapped.amount || unwrapped['amount'];
     const round = unwrapped.round || unwrapped['round'];
 
@@ -184,18 +155,15 @@ function extractRoundData(value: unknown): { winner: string | null; prizeAmount:
 
     if (!value) return null;
 
-    // Unwrap the optional first (get-round-info returns optional)
     const unwrapped = unwrapOptional<Record<string, unknown>>(value);
     if (!unwrapped) return null;
 
     console.log('extractRoundData unwrapped:', JSON.stringify(unwrapped, (_, v) =>
         typeof v === 'bigint' ? v.toString() : v, 2));
 
-    // Extract winner (which is also optional within the round data)
     const winnerValue = unwrapped.winner || unwrapped['winner'];
     const winner = extractPrincipal(winnerValue);
 
-    // Extract prize-amount (handle different key formats)
     const prizeValue = unwrapped['prize-amount'] || unwrapped.prizeAmount || unwrapped['prize_amount'] || 0;
 
     return {
@@ -214,7 +182,7 @@ export function useRaffleContract(userAddress: string | null) {
             setIsLoading(true);
             setError(null);
 
-            // Fetch all basic contract data in parallel
+            // Fetch all basic contract data in parallel (no arguments needed)
             const [
                 currentRoundValue,
                 potBalanceValue,
@@ -251,7 +219,7 @@ export function useRaffleContract(userAddress: string | null) {
                     const lastRoundNum = currentRound - 1;
                     const lastRoundInfo = await callReadOnly(
                         'get-round-info',
-                        [serializeUintArg(lastRoundNum)]
+                        [{ type: 'uint', value: lastRoundNum }]
                     );
 
                     console.log('Last round info raw:', JSON.stringify(lastRoundInfo, (_, v) =>
@@ -278,7 +246,7 @@ export function useRaffleContract(userAddress: string | null) {
                 try {
                     const userTicketsValue = await callReadOnly(
                         'get-user-ticket-count',
-                        [serializePrincipalArg(userAddress)]
+                        [{ type: 'principal', value: userAddress }]
                     );
                     userTickets = Number(userTicketsValue);
                 } catch (e) {
@@ -288,7 +256,7 @@ export function useRaffleContract(userAddress: string | null) {
                 try {
                     const prizeValue = await callReadOnly(
                         'get-unclaimed-prize',
-                        [serializePrincipalArg(userAddress)]
+                        [{ type: 'principal', value: userAddress }]
                     );
 
                     console.log('Unclaimed prize raw:', JSON.stringify(prizeValue, (_, v) =>
