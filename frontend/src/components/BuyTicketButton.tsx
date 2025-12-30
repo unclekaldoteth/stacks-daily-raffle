@@ -114,9 +114,9 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
                         <span className="text-4xl font-bold text-white">{quantity}</span>
                     </div>
                     <button
-                        onClick={() => setQuantity(Math.min(10, quantity + 1))}
+                        onClick={() => setQuantity(Math.min(50, quantity + 1))}
                         className="w-12 h-12 rounded-full bg-gray-800 hover:bg-gray-700 text-2xl font-bold text-gray-300 transition-colors"
-                        disabled={quantity >= 10}
+                        disabled={quantity >= 50}
                     >
                         +
                     </button>
@@ -125,7 +125,7 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
 
             {/* Quick select buttons */}
             <div className="flex justify-center gap-2 mb-6">
-                {[1, 3, 5, 10].map((num) => (
+                {[1, 5, 10, 25, 50].map((num) => (
                     <button
                         key={num}
                         onClick={() => setQuantity(num)}

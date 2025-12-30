@@ -18,6 +18,9 @@
 ;; Minimum blocks before drawing is allowed (prevents same-block manipulation)
 (define-constant MIN-BLOCKS-BEFORE-DRAW u10)
 
+;; Maximum tickets per transaction (fold list limitation)
+(define-constant MAX-TICKETS-PER-TX u50)
+
 ;; ============================================
 ;; Error Codes
 ;; ============================================
@@ -31,6 +34,7 @@
 (define-constant ERR-ROUND-NOT-FOUND (err u106))
 (define-constant ERR-NO-PRIZE-TO-CLAIM (err u107))
 (define-constant ERR-ALREADY-CLAIMED (err u108))
+(define-constant ERR-EXCEEDS-MAX-TICKETS (err u109))
 
 ;; ============================================
 ;; Data Variables
@@ -188,10 +192,14 @@
       (user-ticket-info (default-to { count: u0 } (map-get? User-Tickets { round: round, user: tx-sender })))
       (is-new-player (is-eq (get count user-ticket-info) u0))
     )
+    ;; Validate quantity doesn't exceed max
+    (asserts! (<= quantity MAX-TICKETS-PER-TX) ERR-EXCEEDS-MAX-TICKETS)
+    
     (try! (stx-transfer? total-cost tx-sender current-contract))
     
+    ;; Register each ticket using fold (supports up to 50 tickets)
     (fold register-ticket-fold
-      (list u1 u2 u3 u4 u5 u6 u7 u8 u9 u10)
+      (list u1 u2 u3 u4 u5 u6 u7 u8 u9 u10 u11 u12 u13 u14 u15 u16 u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32 u33 u34 u35 u36 u37 u38 u39 u40 u41 u42 u43 u44 u45 u46 u47 u48 u49 u50)
       { start-id: start-ticket-id, round: round, quantity: quantity, registered: u0 }
     )
     
