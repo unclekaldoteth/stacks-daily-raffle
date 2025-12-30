@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { cvToValue, deserializeCV, serializeCV, principalCV, uintCV } from '@stacks/transactions';
+import { serializeCV, principalCV, uintCV } from '@stacks/transactions';
 import { CONTRACT_ADDRESS, CONTRACT_NAME } from '@/lib/constants';
 
 interface LastWinnerInfo {
@@ -46,6 +46,7 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 // Helper function to call read-only contract functions via our server-side proxy
+// The server deserializes Clarity values and returns plain JSON
 async function callReadOnly(functionName: string, functionArgs: string[] = []): Promise<unknown> {
     const response = await fetch('/api/contract', {
         method: 'POST',
@@ -65,13 +66,15 @@ async function callReadOnly(functionName: string, functionArgs: string[] = []): 
 
     const data = await response.json();
 
-    if (data.okay && data.result) {
-        // Deserialize the Clarity value from hex
-        // data.result is a hex string starting with "0x"
-        const hexString = data.result.startsWith('0x') ? data.result.slice(2) : data.result;
-        const bytes = new Uint8Array(hexString.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16)));
-        const cv = deserializeCV(bytes);
-        return cvToValue(cv);
+    // The server now returns { okay: true, result: "0x...", value: <deserialized> }
+    // Use the pre-deserialized 'value' field to avoid CSP eval() issues
+    if (data.okay && data.value !== undefined) {
+        return data.value;
+    }
+
+    // Fallback for error responses
+    if (data.error) {
+        throw new Error(`Contract call failed: ${data.error}`);
     }
 
     throw new Error(`Contract call failed: ${JSON.stringify(data)}`);
