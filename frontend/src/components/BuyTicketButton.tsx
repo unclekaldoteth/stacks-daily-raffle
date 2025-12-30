@@ -1,6 +1,8 @@
+'use client';
+
 import React, { useState } from 'react';
-import { openContractCall } from '@stacks/connect';
-import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
+// NO static imports from @stacks/* - they use eval() which is blocked by CSP
+// All Stacks libraries are loaded dynamically on user action
 import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, TICKET_PRICE_STX } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
 import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
@@ -19,7 +21,6 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
     const totalCost = TICKET_PRICE_STX * quantity;
 
     const handleBuyTicket = async () => {
@@ -32,8 +33,16 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
         setError(null);
 
         try {
+            // Dynamically import Stacks libraries ONLY when user clicks
+            // This avoids loading eval-using code at page load
+            const [{ openContractCall }, { STACKS_MAINNET, STACKS_TESTNET }] = await Promise.all([
+                import('@stacks/connect'),
+                import('@stacks/network')
+            ]);
+
+            const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
+
             // Fetch pre-calculated transaction options from server
-            // This avoids using @stacks/transactions (and eval) on the client
             const response = await fetch('/api/tx-options', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -52,8 +61,6 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
 
             const txOptions = await response.json();
 
-            // txOptions contains: functionName, functionArgs (hex), postConditions (JSON), postConditionMode
-            // openContractCall handles these standard formats
             await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,

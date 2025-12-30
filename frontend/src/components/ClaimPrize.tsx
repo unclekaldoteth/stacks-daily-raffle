@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { openContractCall } from '@stacks/connect';
-import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
+// NO static imports from @stacks/* - they use eval() which is blocked by CSP
+// All Stacks libraries are loaded dynamically on user action
 import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, formatSTX, PostConditionMode } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
 import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
@@ -18,8 +18,6 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
     const [showSwapOption, setShowSwapOption] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
-
     if (!isConnected || !userAddress || !unclaimedPrize) {
         return null;
     }
@@ -29,17 +27,21 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
         setError(null);
 
         try {
-            // Use Allow mode for claiming
-            // The contract will send the prize amount to the user
-            // Post-conditions on contract transfers can be unreliable
+            // Dynamically import Stacks libraries ONLY when user clicks
+            // This avoids loading eval-using code at page load
+            const [{ openContractCall }, { STACKS_MAINNET, STACKS_TESTNET }] = await Promise.all([
+                import('@stacks/connect'),
+                import('@stacks/network')
+            ]);
+
+            const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
+
             await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,
                 contractName: CONTRACT_NAME,
                 functionName: 'claim-prize',
                 functionArgs: [],
-                // Allow mode - the contract handles the transfer
-                // This is safe because the contract determines the exact prize amount
                 postConditionMode: PostConditionMode.Allow,
                 postConditions: [],
                 onFinish: (data) => {
@@ -90,6 +92,13 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
                             STX
                         </span>
                     </div>
+
+                    {/* Error display */}
+                    {error && (
+                        <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded-lg text-white text-sm">
+                            {error}
+                        </div>
+                    )}
 
                     {/* Claim Button */}
                     <button
@@ -149,7 +158,6 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
                             className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500
                          text-white font-bold hover:from-cyan-400 hover:to-blue-400 transition-all"
                             onClick={() => {
-                                // In production, this would call the swap contract
                                 alert('Swap feature requires contract deployment to mainnet with USDCx liquidity');
                             }}
                         >

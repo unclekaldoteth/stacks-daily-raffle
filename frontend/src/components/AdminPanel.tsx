@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { openContractCall } from '@stacks/connect';
-import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
+// NO static imports from @stacks/* - they use eval() which is blocked by CSP
+// All Stacks libraries are loaded dynamically on user action
 import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, PostConditionMode } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
 import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
@@ -27,8 +27,6 @@ export function AdminPanel({
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
-
     // Check if current user is contract owner
     const isOwner = userAddress === CONTRACT_ADDRESS;
 
@@ -42,21 +40,21 @@ export function AdminPanel({
         setSuccess(null);
 
         try {
-            // Use Allow mode without strict post-conditions for draw-winner
-            // The contract handles the STX transfers internally (dev fee to owner, prize to winner pool)
-            // Post-conditions on contract-internal transfers are complex and error-prone
-            // The contract itself is the source of truth for these amounts
+            // Dynamically import Stacks libraries ONLY when user clicks
+            // This avoids loading eval-using code at page load
+            const [{ openContractCall }, { STACKS_MAINNET, STACKS_TESTNET }] = await Promise.all([
+                import('@stacks/connect'),
+                import('@stacks/network')
+            ]);
+
+            const network = IS_MAINNET ? STACKS_MAINNET : STACKS_TESTNET;
+
             await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,
                 contractName: CONTRACT_NAME,
                 functionName: 'draw-winner',
                 functionArgs: [],
-                // Allow mode - the contract handles all internal transfers
-                // This is safe because:
-                // 1. Only the contract owner can call this function
-                // 2. The contract logic determines exactly how much goes where
-                // 3. Post-conditions on contract addresses are unreliable
                 postConditionMode: PostConditionMode.Allow,
                 postConditions: [],
                 onFinish: (data) => {
