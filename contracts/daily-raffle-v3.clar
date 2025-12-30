@@ -150,7 +150,7 @@
       (user-ticket-info (default-to { count: u0 } (map-get? User-Tickets { round: round, user: tx-sender })))
       (is-new-player (is-eq (get count user-ticket-info) u0))
     )
-    (try! (stx-transfer? TICKET-PRICE tx-sender (as-contract tx-sender)))
+    (try! (stx-transfer? TICKET-PRICE tx-sender current-contract))
     
     (map-set Tickets
       { round: round, ticket-id: new-ticket-id }
@@ -195,7 +195,7 @@
     ;; Validate quantity doesn't exceed max
     (asserts! (<= quantity MAX-TICKETS-PER-TX) ERR-EXCEEDS-MAX-TICKETS)
     
-    (try! (stx-transfer? total-cost tx-sender (as-contract tx-sender)))
+    (try! (stx-transfer? total-cost tx-sender current-contract))
     
     ;; Register each ticket using fold (supports up to 50 tickets)
     (fold register-ticket-fold
@@ -275,8 +275,8 @@
         (winner-prize (- pot-balance dev-fee))
       )
       
-      ;; Transfer dev fee from contract to owner (Clarity 3 syntax)
-      (try! (as-contract (stx-transfer? dev-fee tx-sender CONTRACT-OWNER)))
+      ;; Transfer dev fee from contract to owner
+      (try! (as-contract? ((with-stx dev-fee)) (unwrap-panic (stx-transfer? dev-fee current-contract CONTRACT-OWNER))))
       
       (map-set Unclaimed-Prizes winner
         { amount: winner-prize, round: round }
@@ -324,8 +324,9 @@
       (prize-amount (get amount prize-info))
       (prize-round (get round prize-info))
     )
-    ;; Transfer STX from contract to the winner (Clarity 3 syntax)
-    (try! (as-contract (stx-transfer? prize-amount tx-sender contract-caller)))
+    ;; Transfer STX from contract to the winner (contract-caller)
+    ;; as-contract? allows contract to transfer its own STX; unwrap-panic the inner response
+    (try! (as-contract? ((with-stx prize-amount)) (unwrap-panic (stx-transfer? prize-amount current-contract contract-caller))))
     
     (map-delete Unclaimed-Prizes tx-sender)
     
