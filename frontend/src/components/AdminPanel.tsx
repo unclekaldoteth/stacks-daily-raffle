@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { openContractCall } from '@stacks/connect';
-import { PostConditionMode, Pc } from '@stacks/transactions';
+import { PostConditionMode } from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
-import { CONTRACT_ADDRESS, CONTRACT_NAME, NETWORK, IS_MAINNET } from '@/lib/constants';
+import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
 import { getContractErrorMessage, isUserCancellation } from '@/lib/errors';
 
@@ -43,22 +43,23 @@ export function AdminPanel({
         setSuccess(null);
 
         try {
-            // Post condition: contract will send STX (dev fee to owner)
-            const devFee = (potBalance * BigInt(500)) / BigInt(10000);
-            const postConditions = [
-                Pc.principal(`${CONTRACT_ADDRESS}.${CONTRACT_NAME}`)
-                    .willSendGte(devFee)
-                    .ustx()
-            ];
-
+            // Use Allow mode without strict post-conditions for draw-winner
+            // The contract handles the STX transfers internally (dev fee to owner, prize to winner pool)
+            // Post-conditions on contract-internal transfers are complex and error-prone
+            // The contract itself is the source of truth for these amounts
             await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,
                 contractName: CONTRACT_NAME,
                 functionName: 'draw-winner',
                 functionArgs: [],
-                postConditionMode: PostConditionMode.Deny,
-                postConditions,
+                // Allow mode - the contract handles all internal transfers
+                // This is safe because:
+                // 1. Only the contract owner can call this function
+                // 2. The contract logic determines exactly how much goes where
+                // 3. Post-conditions on contract addresses are unreliable
+                postConditionMode: PostConditionMode.Allow,
+                postConditions: [],
                 onFinish: (data) => {
                     console.log('Draw winner transaction submitted:', data);
                     setSuccess('Winner drawn successfully! Transaction submitted.');

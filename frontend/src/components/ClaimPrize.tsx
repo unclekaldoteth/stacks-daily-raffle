@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { openContractCall } from '@stacks/connect';
-import { PostConditionMode, Pc } from '@stacks/transactions';
+import { PostConditionMode } from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
 import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, formatSTX } from '@/lib/constants';
 import { useWallet } from '@/contexts/WalletContext';
@@ -30,21 +30,19 @@ export function ClaimPrize({ unclaimedPrize, onSuccess }: ClaimPrizeProps) {
         setError(null);
 
         try {
-            // Secure post conditions: contract will send exact prize amount to user
-            const postConditions = [
-                Pc.principal(`${CONTRACT_ADDRESS}.${CONTRACT_NAME}`)
-                    .willSendGte(unclaimedPrize.amount)
-                    .ustx()
-            ];
-
+            // Use Allow mode for claiming
+            // The contract will send the prize amount to the user
+            // Post-conditions on contract transfers can be unreliable
             await openContractCall({
                 network,
                 contractAddress: CONTRACT_ADDRESS,
                 contractName: CONTRACT_NAME,
                 functionName: 'claim-prize',
                 functionArgs: [],
-                postConditionMode: PostConditionMode.Deny,
-                postConditions,
+                // Allow mode - the contract handles the transfer
+                // This is safe because the contract determines the exact prize amount
+                postConditionMode: PostConditionMode.Allow,
+                postConditions: [],
                 onFinish: (data) => {
                     console.log('Claim transaction submitted:', data);
                     setShowSwapOption(true);

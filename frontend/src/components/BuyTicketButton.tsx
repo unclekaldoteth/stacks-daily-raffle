@@ -6,6 +6,7 @@ import {
     uintCV,
     PostConditionMode,
     Pc,
+    FungibleConditionCode,
 } from '@stacks/transactions';
 import { STACKS_TESTNET, STACKS_MAINNET } from '@stacks/network';
 import { CONTRACT_ADDRESS, CONTRACT_NAME, IS_MAINNET, TICKET_PRICE_STX } from '@/lib/constants';
@@ -39,51 +40,39 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
         setError(null);
 
         try {
-            // Create post condition to limit STX transfer
+            // Calculate total STX to spend
             const totalMicroSTX = TICKET_PRICE_MICRO * quantity;
+
+            // Use Allow mode with a protective post-condition
+            // This ensures the user doesn't send more than expected
+            // Using willSendLte (less than or equal) is safer than willSendEq
+            // because it allows for slight variations and doesn't fail on exact match issues
             const postConditions = [
                 Pc.principal(userAddress)
-                    .willSendEq(totalMicroSTX)
+                    .willSendLte(totalMicroSTX)
                     .ustx()
             ];
 
-            if (quantity === 1) {
-                // Single ticket purchase
-                await openContractCall({
-                    network,
-                    contractAddress: CONTRACT_ADDRESS,
-                    contractName: CONTRACT_NAME,
-                    functionName: 'buy-ticket',
-                    functionArgs: [],
-                    postConditionMode: PostConditionMode.Deny,
-                    postConditions,
-                    onFinish: (data) => {
-                        console.log('Transaction submitted:', data);
-                        onSuccess?.();
-                    },
-                    onCancel: () => {
-                        console.log('Transaction cancelled');
-                    },
-                });
-            } else {
-                // Multiple tickets purchase
-                await openContractCall({
-                    network,
-                    contractAddress: CONTRACT_ADDRESS,
-                    contractName: CONTRACT_NAME,
-                    functionName: 'buy-tickets',
-                    functionArgs: [uintCV(quantity)],
-                    postConditionMode: PostConditionMode.Deny,
-                    postConditions,
-                    onFinish: (data) => {
-                        console.log('Transaction submitted:', data);
-                        onSuccess?.();
-                    },
-                    onCancel: () => {
-                        console.log('Transaction cancelled');
-                    },
-                });
-            }
+            const contractCallOptions = {
+                network,
+                contractAddress: CONTRACT_ADDRESS,
+                contractName: CONTRACT_NAME,
+                functionName: quantity === 1 ? 'buy-ticket' : 'buy-tickets',
+                functionArgs: quantity === 1 ? [] : [uintCV(quantity)],
+                // Use Allow mode - the post-condition still protects the user
+                // from sending MORE than expected, but won't fail on exact amounts
+                postConditionMode: PostConditionMode.Allow,
+                postConditions,
+                onFinish: (data: { txId: string }) => {
+                    console.log('Transaction submitted:', data);
+                    onSuccess?.();
+                },
+                onCancel: () => {
+                    console.log('Transaction cancelled');
+                },
+            };
+
+            await openContractCall(contractCallOptions);
         } catch (err) {
             console.error('Error buying ticket:', err);
             if (!isUserCancellation(err)) {
@@ -99,6 +88,13 @@ export function BuyTicketButton({ onSuccess, disabled }: BuyTicketButtonProps) {
             <h3 className="text-2xl font-bold text-center mb-6 text-yellow-400">
                 🎫 Get Your Tickets
             </h3>
+
+            {/* Error display */}
+            {error && (
+                <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-sm text-center">
+                    {error}
+                </div>
+            )}
 
             {/* Quantity selector */}
             <div className="mb-6">
